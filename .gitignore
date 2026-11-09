@@ -15,3 +15,6 @@ Payload/
 .DS_Store
 Thumbs.db
 node_modules/
+
+# Android 交付产物（本地打包，不入库）
+dist/

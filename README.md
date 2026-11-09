@@ -30,6 +30,19 @@
 
 > ipa 是**未签名**的，必须用你自己的 Apple ID 重新签名才能安装（免费，不需要开发者账号）。
 
+### Android
+
+Android 版与 iOS 共用同一套离线数据与页面，外壳换成 WebView 实现，功能对齐 V1.0.1。
+
+| 项目 | 说明 |
+| --- | --- |
+| 下载 | 前往 [Releases](../../releases) 下载 `StudentDex-1.0.1-android.apk`（release 签名，直接安装） |
+| 系统要求 | Android 7.0（API 24）及以上；系统 WebView ≥ 111 |
+| 源码 | [`android/`](android/)，Kotlin 单 Activity + `WebViewAssetLoader`，`web/` 零改动零拷贝 |
+| 构建 | `cd android && gradle :app:assembleDebug`（需要 Android SDK 35 + JDK 17+；release 签名读取 `android/keystore.properties`，不入库） |
+
+> 首次安装会替换同包名的旧版本（签名不同需先卸载），收藏与同步数据保存在应用私有目录。
+
 ---
 
 ## 安装
