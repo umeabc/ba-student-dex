@@ -18,6 +18,10 @@
 | 标签 | 什亭之匣（launcher 图标来自 `web/icon.png`，5 档 mipmap） |
 | 签名 | Gradle 默认 debug keystore（**不可上架/长期分发**） |
 
+**发布用 release 包**：`dist/StudentDex-1.0.1-android.apk`（52,491,120 字节，SHA-256 `61e2642adf9634f703dc07aeaad5856e7d635c35097667dcf95dd900347a6185`），
+使用独立 release keystore 签名（`CN=StudentDex, OU=Android, O=StudentDex`，证书 SHA-256 `63ea77e9fa7921dd03bffcecf22694a66505d2c785ea14e1db272ff89149c681`），
+已上传 GitHub Release `android-v1.0.1`。上表体积/SHA 指 debug 包。
+
 ## 2. 构建与安装（本机复现）
 
 ```bash
@@ -59,6 +63,7 @@ D:/leidian/LDPlayer14/adb.exe shell am start -n com.sensei.studentdex/.MainActiv
 | 19 | 离线 | CDP `Network.emulateNetworkConditions(offline)` | 281 张卡片与图片仍正常（资源全在包内）；同步失败仅影响「更多」页状态文案 |
 | 20 | 内存 | `dumpsys meminfo` | 主进程 PSS ≈ 101MB；渲染进程 RSS ≈ 260MB（56MB 资源 + 281 图） |
 | 21 | 构建可重复 | 清理后重编 | BUILD SUCCESSFUL，APK 内 `assets/index.html`（无 `assets/web/` 多一层） |
+| 22 | 应用图标 | 桌面查看 | 自适应图标（`mipmap-anydpi-v26`，蓝底 `#218AD6` + 角色前景 66% 安全区），圆角遮罩下完整；旧版图标同源生成 |
 
 > gamekee 接口在本机网络出口**时通时断**：曾成功同步并落盘 1.6MB overlay（角标生效），随后 TLS 握手失败。桥行为、落盘、失败降级与 UI 提示均已覆盖。
 
@@ -72,6 +77,7 @@ D:/leidian/LDPlayer14/adb.exe shell am start -n com.sensei.studentdex/.MainActiv
 | 4 | `MainActivity.kt` | `target="_blank" rel="noreferrer"` 链接在 `setSupportMultipleWindows(false)` 下被 WebView 静默丢弃（资料页来源链接、更新弹窗「立即更新」都受影响） | 开启多窗口并实现 `WebChromeClient.onCreateWindow`：用一次性 WebView 捕获弹窗 URL → `ACTION_VIEW` 交系统浏览器 → 销毁 |
 | 5 | `AssetServer.kt` / `BridgeShim.kt` | **列表页手指划不动**：`web/styles.css` 的 `html, body { overflow-x: hidden }` 让 Chromium 把根元素当成内容高度的滚动容器（`overflow-y` 计算为 `auto`），视口无法触摸滚动——但 `window.scrollTo`/详情页内滚仍正常，所以极易漏测 | 注入 `html{overflow:visible!important}`（`BridgeShim.LAYOUT_CSS`），保留 body 的横向裁剪；实测上滑 `y 0→630`、下滑回顶、横向 `scrollWidth==clientWidth` |
 
+| 6 | `res/mipmap-*`、`AndroidManifest.xml`、`values/colors.xml` | 应用图标仍为旧版四宫格 | 按用户提供的新图（256×256、蓝底圆形徽标）重新生成：自适应图标（背景色 + 前景 66%）+ 5 档旧版图标，`roundIcon` 同步 |
 ## 5. 已知问题与限制
 
 1. **更新弹窗指向 iOS Release 页**：`web/update.js` 用 `releases/latest` 的 `html_url`，Android 用户会被带到同时含 IPA 的发布页。发 Android 版时应在 Release 里附 APK，并把更新说明改成双端措辞（属 web 侧内容，不改代码路径）。
@@ -80,7 +86,8 @@ D:/leidian/LDPlayer14/adb.exe shell am start -n com.sensei.studentdex/.MainActiv
 4. **同步依赖 gamekee（网络不稳定）**：已实测一次成功同步并落盘 1.6MB overlay、重启后角标生效；但随后同一网络下 `www.gamekee.com` 又不可达（`status=0`），「更多」页显示「检查失败」。属网络可达性问题，非实现缺陷；换稳定网络可复验。
 5. **debug 签名**：可安装测试，不适合上架或长期分发；release 构建目前未签名（`assembleRelease` 产物需自行签名）。
 6. **弹窗 WebView 边界**：`onCreateWindow` 的一次性 WebView 若遇到 `about:blank + document.write` 型弹窗，可能拿不到 URL（本 App 不产生此类弹窗）。
-7. 未做 Adaptive Icon、启动画面定制、横屏/平板适配（与 iOS 一致锁竖屏）。
+7. 未做启动画面定制、横屏/平板适配（与 iOS 一致锁竖屏）。
+8. **iOS 图标未替换**：源图只有 256×256，iOS AppIcon 需要 1024×1024，直接放大发虚；拿到大图后可一并替换 `StudentDex/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png`。
 
 ## 6. 后续建议
 
