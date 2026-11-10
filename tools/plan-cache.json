@@ -1,0 +1,19 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "CV1-media", "wait": 2500, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"148495\"]').click();document.querySelector('[data-act=dt][data-t=media]').click();var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('表情')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "CV2-cached", "after": 6000, "wait": 300,
+      "js": "(function(){var imgs=Array.from(document.querySelectorAll('.mgallery img'));return {loaded:imgs.filter(function(i){return i.src.indexOf('blob:')===0}).length,cacheKeys:Object.keys(window.__cacheMem||{}).length,note:document.querySelector('.netnote')?document.querySelector('.netnote').textContent:null,errs:window.__errs}})()" },
+    { "name": "CV3-more", "after": 900, "wait": 300,
+      "js": "(function(){document.querySelector('[data-act=dtback]')||document.querySelector('[data-act=back]').click();setTimeout(function(){document.querySelector('[data-tab=more]').click()},300);return 'ok'})()" },
+    { "name": "CV4-size", "after": 1200, "wait": 200,
+      "js": "(function(){var el=document.getElementById('cache-size');return {sizeText:el?el.textContent:null,hasClear:!!document.querySelector('[data-act=cache-clear]'),errs:window.__errs}})()" },
+    { "name": "CV5-clear", "after": 1200, "wait": 200,
+      "js": "(function(){var b=document.querySelector('[data-act=cache-clear]');if(!b)return{noBtn:true};b.click();return 'clicked'})()" },
+    { "name": "CV6-after-clear", "after": 1000, "wait": 200,
+      "js": "(function(){return {sizeText:(document.getElementById('cache-size')||{}).textContent,cacheKeys:Object.keys(window.__cacheMem||{}).length,toast:(document.querySelector('.toast')||{}).textContent,errs:window.__errs}})()" }
+  ]
+}

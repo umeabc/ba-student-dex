@@ -1,0 +1,12 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "colorScheme": "dark",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "AA1-dark", "wait": 2400, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"118239\"]').click();document.querySelector('[data-act=dt][data-t=voice]').click();return 'ok'})()" },
+    { "name": "AA2-dark", "after": 6000, "wait": 200,
+      "js": "(function(){return {dark:matchMedia('(prefers-color-scheme: dark)').matches,buttons:document.querySelectorAll('.vplay').length,errs:window.__errs}})()" }
+  ]
+}

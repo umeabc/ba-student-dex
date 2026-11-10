@@ -57,6 +57,10 @@ final class BridgeHandler: NSObject, WKScriptMessageHandler {
             handleStore(id: id, body: body)
             return
         }
+        if op == "cache" {
+            handleCache(id: id, body: body)
+            return
+        }
 
         guard let urlString = body["url"] as? String,
               let url = URL(string: urlString),
@@ -100,6 +104,79 @@ final class BridgeHandler: NSObject, WKScriptMessageHandler {
         reply(id: id, status: 200, data: data)
     }
 
+    // MARK: - 素材缓存（影画 / 语音的二进制文件，按 url 的 sha256 存盘）
+
+    private var cacheDir: URL {
+        let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let dir = base.appendingPathComponent("ba-media", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        }
+        return dir
+    }
+
+    /// 稳定文件名（不能用 Swift 的 hashValue，它每个进程都会变）
+    private func cacheName(for key: String) -> String {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in key.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
+        }
+        return String(format: "%016llx", hash)
+    }
+
+    private func handleCache(id: String, body: [String: Any]) {
+        let action = (body["action"] as? String) ?? "get"
+        let dir = cacheDir
+
+        switch action {
+        case "set":
+            guard let key = body["key"] as? String,
+                  let b64 = body["data"] as? String,
+                  let data = Data(base64Encoded: b64) else {
+                reply(id: id, status: 400, data: nil)
+                return
+            }
+            let file = dir.appendingPathComponent(cacheName(for: key))
+            do {
+                try data.write(to: file, options: .atomic)
+                reply(id: id, status: 200, data: Data())
+            } catch {
+                reply(id: id, status: 500, data: nil)
+            }
+
+        case "get":
+            guard let key = body["key"] as? String else {
+                reply(id: id, status: 400, data: nil)
+                return
+            }
+            let file = dir.appendingPathComponent(cacheName(for: key))
+            if let data = try? Data(contentsOf: file) {
+                reply(id: id, status: 200, data: data)
+            } else {
+                reply(id: id, status: 404, data: nil)
+            }
+
+        case "size":
+            var total: Int64 = 0
+            if let files = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: [.fileSizeKey]) {
+                for f in files {
+                    total += Int64((try? f.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+                }
+            }
+            reply(id: id, status: 200, data: Data(String(total).utf8))
+
+        case "clear":
+            let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+            for f in files { try? FileManager.default.removeItem(at: f) }
+            reply(id: id, status: 200, data: Data())
+
+        default:
+            reply(id: id, status: 400, data: nil)
+        }
+    }
+
     // MARK: - reply
 
     private func reply(id: String, status: Int, data: Data?) {
@@ -117,7 +194,7 @@ struct WebShell: UIViewRepresentable {
     func makeUIView(context: Context) -> ShellWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
-        configuration.mediaTypesRequiringUserActionForPlayback = .all
+        configuration.mediaTypesRequiringUserActionForPlayback = []
 
         let preferences = WKWebpagePreferences()
         preferences.allowsContentJavaScript = true

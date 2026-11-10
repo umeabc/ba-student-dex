@@ -1,0 +1,20 @@
+{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390,
+  "height": 844,
+  "dpr": 3,
+  "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});window.addEventListener('unhandledrejection',function(e){window.__errs.push('reject: '+(e.reason&&e.reason.message||e.reason))});window.__played=[];const _A=window.Audio;window.Audio=function(u){var a=new _A(u);window.__played.push(u);return a};",
+  "shots": [
+    { "name": "X1-open-voice", "wait": 2600, "after": 500,
+      "js": "(function(){var c=document.querySelector('[data-act=open][data-id=\"118239\"]');c.click();document.querySelector('[data-act=dt][data-t=voice]').click();return 'ok'})()" },
+    { "name": "X2-audio ready", "after": 6000, "wait": 200,
+      "js": "(function(){var cv=document.querySelector('.cv-line');var trig=document.querySelector('.vtrans');var plays=document.querySelectorAll('.vplay');var items=document.querySelectorAll('.voice-item');return {cv:cv?cv.textContent.replace(/\\s+/g,' ').trim():null,transToggle:trig?trig.textContent.replace(/\\s+/g,' ').trim():null,playButtons:plays.length,items:items.length,loading:!!document.querySelector('.vplays.loading'),firstTags:Array.from(document.querySelectorAll('.vtag')).slice(0,3).map(function(t){return t.textContent}),errs:window.__errs}})()" },
+    { "name": "X3-click-play", "after": 2500, "wait": 100,
+      "js": "(function(){var b=document.querySelector('.vplay');if(!b)return{noButton:true};b.click();return {url:b.dataset.url,lang:b.dataset.lang}})()" },
+    { "name": "X4-playing", "after": 1200, "wait": 100,
+      "js": "(function(){var on=document.querySelector('.vplay.on');return {playing:!!on,audioCreated:window.__played.length,audioSrc:window.__played[0]?String(window.__played[0]).slice(0,40):null,errs:window.__errs}})()" },
+    { "name": "X5-toggle-fan", "after": 400, "wait": 100,
+      "js": "(function(){var f=Array.from(document.querySelectorAll('.vchip')).filter(function(x){return x.textContent.indexOf('民间')>=0})[0];if(!f)return{noToggle:true};f.click();var tags=Array.from(document.querySelectorAll('.vtag')).slice(0,3).map(function(t){return t.textContent});return {tags:tags,firstText:(document.querySelector('.voice-item .zh')||{}).textContent}})()" }
+  ]
+}

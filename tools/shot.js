@@ -54,6 +54,7 @@ async function main() {
   const child = spawn(CHROME, [
     '--headless=new',
     '--disable-gpu',
+    '--autoplay-policy=no-user-gesture-required',
     '--hide-scrollbars',
     '--no-first-run',
     '--no-default-browser-check',

@@ -1,0 +1,26 @@
+{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390,
+  "height": 844,
+  "dpr": 3,
+  "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});window.addEventListener('unhandledrejection',function(e){window.__errs.push('reject: '+(e.reason&&e.reason.message||e.reason))});",
+  "shots": [
+    { "name": "MD1-open", "wait": 2500, "after": 400,
+      "js": "(function(){var c=document.querySelector('[data-act=open][data-id=\"148495\"]');c.click();document.querySelector('[data-act=dt][data-t=media]').click();return 'ok'})()" },
+    { "name": "MD2-loaded", "after": 7000, "wait": 300,
+      "js": "(function(){var chips=Array.from(document.querySelectorAll('.voice-cat .chip')).map(function(c){return c.textContent});var imgs=Array.from(document.querySelectorAll('.mgallery img'));return {chips:chips,imgCount:imgs.length,loaded:imgs.filter(function(i){return i.src.indexOf('blob:')===0}).length,failed:Array.from(document.querySelectorAll('.mph')).map(function(p){return p.textContent}).filter(Boolean),errs:window.__errs}})()" },
+    { "name": "MD3-stamps", "after": 2500, "wait": 200,
+      "js": "(function(){var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('表情')>=0})[0];if(!c)return{noStamps:true};c.click();return 'clicked'})()" },
+    { "name": "MD4-stamps-shot", "after": 6000, "wait": 200,
+      "js": "(function(){var imgs=Array.from(document.querySelectorAll('.mgallery img'));return {count:imgs.length,loaded:imgs.filter(function(i){return i.src.indexOf('blob:')===0}).length,errs:window.__errs}})()" },
+    { "name": "MD5-viewer", "after": 800, "wait": 200,
+      "js": "(function(){var f=document.querySelector('.mcard[data-act=mview]');if(!f)return{noCard:true};f.click();return 'opened'})()" },
+    { "name": "MD6-viewer-shot", "after": 3000, "wait": 200,
+      "js": "(function(){var img=document.getElementById('mv-img');return {viewer:!!document.getElementById('media-viewer'),hasSrc:img?img.src.indexOf('blob:')===0:false,errs:window.__errs}})()" },
+    { "name": "MD7-videos", "after": 500, "wait": 100,
+      "js": "(function(){document.querySelector('[data-act=mclose]').click();var v=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('视频')>=0})[0];if(!v)return{noVideos:true};v.click();return 'ok'})()" },
+    { "name": "MD8-video-list", "after": 900, "wait": 100,
+      "js": "(function(){var cards=Array.from(document.querySelectorAll('.mcard.vid'));return {videoCards:cards.map(function(c){return c.querySelector('.mlabel').textContent})}})()" }
+  ]
+}

@@ -1,0 +1,15 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "ME1", "wait": 2500, "after": 300,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"148495\"]').click();document.querySelector('[data-act=dt][data-t=media]').click();var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('表情')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "ME2-lazy", "after": 5000, "wait": 200,
+      "js": "(function(){var imgs=Array.from(document.querySelectorAll('.mgallery img'));return {total:imgs.length,loaded:imgs.filter(function(i){return i.src.indexOf('blob:')===0}).length,errs:window.__errs}})()" },
+    { "name": "ME3-scroll", "after": 5000, "wait": 200,
+      "js": "(function(){var d=document.getElementById('detail');d.scrollTop=d.scrollHeight;return 'scrolled'})()" },
+    { "name": "ME4-after-scroll", "after": 4000, "wait": 200,
+      "js": "(function(){var imgs=Array.from(document.querySelectorAll('.mgallery img'));return {total:imgs.length,loaded:imgs.filter(function(i){return i.src.indexOf('blob:')===0}).length,errs:window.__errs}})()" }
+  ]
+}

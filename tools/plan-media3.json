@@ -1,0 +1,17 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "MF1-intro", "wait": 2500, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"148495\"]').click();document.querySelector('[data-act=dt][data-t=media]').click();var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('官方介绍')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "MF2-intro-shot", "after": 5000, "wait": 200,
+      "js": "(function(){var i=document.querySelector('.mgallery img');return {loaded:i?i.src.indexOf('blob:')===0:false,errs:window.__errs}})()" },
+    { "name": "MF3-video", "after": 600, "wait": 100,
+      "js": "(function(){var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('视频')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "MF4-play", "after": 800, "wait": 100,
+      "js": "(function(){var b=document.querySelector('.mcard.vid');if(!b)return{no:true};b.click();return 'clicked'})()" },
+    { "name": "MF5-video-shot", "after": 9000, "wait": 300,
+      "js": "(function(){var v=document.getElementById('mv-video');return {viewer:!!document.getElementById('media-viewer'),videoSrc:v?v.src.slice(0,12):null,readyState:v?v.readyState:null,duration:v?Math.round(v.duration||0):null,errs:window.__errs}})()" }
+  ]
+}

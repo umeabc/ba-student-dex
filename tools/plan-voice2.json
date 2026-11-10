@@ -1,0 +1,15 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.__events=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});const _A=window.Audio;window.Audio=function(u){var a=new _A(u);a.addEventListener('playing',function(){window.__events.push('playing')});a.addEventListener('ended',function(){window.__events.push('ended')});a.addEventListener('error',function(){window.__events.push('error:'+(a.error&&a.error.code))});a.addEventListener('pause',function(){window.__events.push('pause')});return a};",
+  "shots": [
+    { "name": "Y1-open", "wait": 2400, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"118239\"]').click();document.querySelector('[data-act=dt][data-t=voice]').click();return 'ok'})()" },
+    { "name": "Y2-loaded", "after": 6000, "wait": 100,
+      "js": "(function(){var b=document.querySelectorAll('.vplay');return {buttons:b.length}})()" },
+    { "name": "Y3-play2", "after": 900, "wait": 100,
+      "js": "(function(){var bs=document.querySelectorAll('.vplay');if(bs.length<2)return{no:true};bs[1].click();return {url:bs[1].dataset.url.slice(-40)}})()" },
+    { "name": "Y4-state", "after": 1200, "wait": 100,
+      "js": "(function(){return {events:window.__events,onButtons:document.querySelectorAll('.vplay.on').length,errs:window.__errs}})()" }
+  ]
+}

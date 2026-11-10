@@ -48,6 +48,9 @@ function rewriteStudent(s) {
 
   // 同名角色只用来跳转，图标不打包（远程图会因 Referer 校验加载失败）
   (s.sameName || []).forEach((x) => { x.icon = ''; });
+
+  // 语音音频地址不打包（3.7MB+），App 里点播放时按需向 WIKI 拉取
+  delete s.voiceAudio;
   return s;
 }
 

@@ -24,6 +24,18 @@
       return btoa(bin);
     }
     window.webkit = { messageHandlers: { ba: { postMessage: function (msg) {
+      if (msg.op === 'cache') {
+        window.__cacheMem = window.__cacheMem || {};
+        var act = msg.action, mem = window.__cacheMem;
+        if (act === 'set') { mem[msg.key] = msg.data; window.__baRPC(msg.id, 200, ''); return; }
+        if (act === 'get') { window.__baRPC(msg.id, mem[msg.key] ? 200 : 404, mem[msg.key] || ''); return; }
+        if (act === 'size') {
+          var t = 0; for (var k in mem) t += Math.floor((mem[k] || '').length * 0.75);
+          window.__baRPC(msg.id, 200, b64encode(String(t))); return;
+        }
+        if (act === 'clear') { window.__cacheMem = {}; window.__baRPC(msg.id, 200, ''); return; }
+        window.__baRPC(msg.id, 400, ''); return;
+      }
       if (msg.op === 'store') {
         try {
           if (msg.action === 'save') localStorage.setItem('ba_test_store', msg.value || '');

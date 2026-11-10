@@ -1,0 +1,11 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];",
+  "shots": [
+    { "name": "VX1", "wait": 2500, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"118239\"]').click();document.querySelector('[data-act=dt][data-t=voice]').click();return 'ok'})()" },
+    { "name": "VX2-note", "after": 4000, "wait": 200,
+      "js": "(function(){var n=document.querySelector('.netnote');return {note:n?n.textContent:null,items:document.querySelectorAll('.voice-item').length,errs:window.__errs}})()" }
+  ]
+}

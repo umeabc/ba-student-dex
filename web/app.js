@@ -46,6 +46,11 @@
     detailTab: 'overview',
     skillLv: {},
     voiceCat: null,
+    voiceTrans: 'off',        // 'off' 官方翻译 / 'fan' 民间翻译
+    voiceAudio: undefined,    // undefined=未请求; null=加载中; {}=无音频
+    voiceAudioFor: null,      // 当前 audio 属于哪个学生
+    voiceAudioLoading: {},    // id -> 1（避免重复请求）
+    mediaCat: null,           // 影画鉴赏当前分类
     sheetOpen: false,
     draft: null,
   };
@@ -326,6 +331,15 @@
   }
 
   /* ----------------------------------------------------------------- more */
+  function refreshCacheSize() {
+    if (!window.BASync || !window.BASync.cache || !window.BASync.cache.available()) return;
+    window.BASync.cache.size().then(function (bytes) {
+      state.cacheSizeText = bytes > 0 ? (bytes / 1024 / 1024).toFixed(1) + ' MB' : '0 MB';
+      const el = document.getElementById('cache-size');
+      if (el) el.textContent = state.cacheSizeText;
+    });
+  }
+
   function syncStatusText() {
     if (!window.BASync || !window.BASync.available()) return '需在 App 内使用';
     const st = window.BASync.state;
@@ -348,6 +362,7 @@
   }
 
   function moreView() {
+    setTimeout(refreshCacheSize, 0);
     const schools = uniq(INDEX.map(function (s) { return s.school; })).length;
     const r3 = INDEX.filter(function (s) { return s.rarity === 3; }).length;
     const strikes = INDEX.filter(function (s) { return s.tactic === 'STRIKER'; }).length;
@@ -375,6 +390,12 @@
         '<div class="rowlink"><span>突击 / 支援</span><span class="r">' + strikes + ' / ' + (INDEX.length - strikes) + '</span></div>' +
         '<div class="rowlink"><span>数据来源</span><span class="r">GameKee 蔚蓝档案 WIKI</span></div>' +
         '<div class="rowlink"><span>最新实装</span><span class="r">' + (latestReleaseDate() || '—') + '</span></div>' +
+      '</div>' +
+      '<div class="section-title">存储</div>' +
+      '<div class="panel">' +
+        '<div class="rowlink"><span>素材缓存</span><span class="r" id="cache-size">' + (state.cacheSizeText || '…') + '</span></div>' +
+        '<button class="rowlink" data-act="cache-clear" style="width:100%;text-align:left">' +
+          '<span>清理缓存</span><span class="r">›</span></button>' +
       '</div>' +
       '<div class="section-title">说明</div>' +
       '<div class="panel"><div class="panel-body" style="font-size:12.5px;line-height:1.7;color:var(--sub)">' +
@@ -414,7 +435,7 @@
 
     const TABS = [
       ['overview', '概览'], ['skills', '技能'], ['stats', '属性'], ['grow', '养成'],
-      ['profile', '资料'], ['voice', '语音'], ['art', '立绘'],
+      ['profile', '资料'], ['voice', '语音'], ['media', '影画'],
     ];
     html += '<div class="segwrap"><div class="seg">' +
       TABS.map(function (t) {
@@ -436,7 +457,7 @@
       case 'grow': return growTab(s);
       case 'profile': return profileTab(s);
       case 'voice': return voiceTab(s);
-      case 'art': return artTab(s);
+      case 'media': return mediaTab(s);
       default: return overviewTab(s);
     }
   }
@@ -752,38 +773,346 @@
     const cats = Object.keys(s.voices || {});
     if (!cats.length) return '<div class="empty">暂无语音资料</div>';
     if (!state.voiceCat || cats.indexOf(state.voiceCat) < 0) state.voiceCat = cats[0];
-    const items = s.voices[state.voiceCat] || [];
-    let html = '<div style="height:14px"></div><div class="voice-cat">' + cats.map(function (c) {
+
+    // 是否有官方翻译 / 民间翻译（任意一条即可）
+    let hasOff = false;
+    let hasFan = false;
+    cats.forEach(function (c) {
+      (s.voices[c] || []).forEach(function (v) { if (v.off) hasOff = true; if (v.fan || v.zh) hasFan = true; });
+    });
+    const mode = state.voiceTrans === 'fan' ? 'fan' : 'off';
+
+    // 试听地址按需加载（内置数据里不带，太大）
+    const audio = state.voiceAudioFor === s.id ? state.voiceAudio : undefined;
+    if (audio === undefined) loadVoiceAudio(s);
+    const audioReady = audio && Object.keys(audio).length > 0;
+
+    // 声优
+    const cv = s.cv || {};
+    const cvBits = [];
+    if (cv.jp) cvBits.push(['日配', cv.jp]);
+    if (cv.cn) cvBits.push(['中配', cv.cn]);
+    if (cv.kr) cvBits.push(['韩配', cv.kr]);
+
+    let html = '<div style="height:14px"></div>';
+    if (cvBits.length) {
+      html += '<div class="cv-line">' + cvBits.map(function (b) {
+        return '<span><b>' + esc(b[0]) + '</b>' + esc(b[1]) + '</span>';
+      }).join('') + '</div>';
+    }
+    html += '<div class="voice-cat">' + cats.map(function (c) {
       return '<button class="chip ' + (c === state.voiceCat ? 'on' : '') + '" data-act="vcat" data-c="' + esc(c) + '">' + esc(c) +
         '<span style="opacity:.6;font-weight:600">' + s.voices[c].length + '</span></button>';
     }).join('') + '</div>';
+
+    if (hasOff && hasFan) {
+      html += '<div class="vtrans">' +
+        '<span class="vtrans-label">译文</span>' +
+        '<button class="vchip ' + (mode === 'off' ? 'on' : '') + '" data-act="vtrans" data-m="off">官方翻译</button>' +
+        '<button class="vchip ' + (mode === 'fan' ? 'on' : '') + '" data-act="vtrans" data-m="fan">民间翻译</button>' +
+      '</div>';
+    }
+
+    const items = s.voices[state.voiceCat] || [];
     html += '<div class="panel"><div class="panel-body" style="padding:2px 14px">' + items.map(function (v) {
-      return '<div class="voice-item"><div class="lb">' + esc(v.label) + '</div>' +
+      const key = state.voiceCat + '|' + v.label;
+      const langs = (audioReady && audio[key]) ? audio[key] : null;
+      // 兼容旧版同步缓存：那时只有 v.zh（等于现在的民翻）
+      const vFan = v.fan || v.zh || '';
+      const vOff = v.off || '';
+      const zh = mode === 'off' ? (vOff || vFan) : (vFan || vOff);
+      const isOfficial = mode === 'off' ? !!vOff : (!vFan && !!vOff);
+      const tag = isOfficial ? '官' : '民';
+      let plays = '';
+      if (langs) {
+        const names = ['日', '中', '韩'];
+        plays = '<span class="vplays">' + langs.map(function (u, i) {
+          if (!u) return '';
+          return '<button class="vplay" data-act="vplay" data-url="' + esc(u) + '" data-key="' + esc(key) + '" data-lang="' + i +
+            '" title="' + names[i] + '配">' + '<i>▶</i>' + names[i] + '</button>';
+        }).join('') + '</span>';
+      } else if (audio === null) {
+        plays = '<span class="vplays loading">载入试听…</span>';
+      }
+      return '<div class="voice-item">' +
+        '<div class="vtop"><span class="lb">' + esc(v.label) + '</span>' + plays + '</div>' +
         (v.jp ? '<div class="jp">' + esc(v.jp) + '</div>' : '') +
-        (v.zh ? '<div class="zh">' + esc(v.zh) + '</div>' : '') + '</div>';
+        (zh ? '<div class="zh"><span class="vtag">' + tag + '</span>' + esc(zh) + '</div>' : '') +
+      '</div>';
     }).join('') + '</div></div>';
+    html += '<div class="netnote">语音首次播放需联网加载，之后会缓存到本地</div>';
     return html;
   }
 
-  function artTab(s) {
-    const list = (s.portraits || []).slice();
-    const hallRaw = s.hall && typeof s.hall.image === 'string' ? s.hall.image : '';
-    const hallLocal = hallRaw.indexOf('data:') === 0 || hallRaw.indexOf('portraits/') === 0 || hallRaw.indexOf('img/') === 0;
-    if (!list.length && !hallLocal) return '<div class="empty">暂无立绘</div>';
-    let html = '<div style="height:14px"></div>';
-    html += '<div class="gallery">' + list.map(function (p) {
-      return '<figure><img loading="lazy" src="' + p.url + '" alt="">' +
-        '<figcaption>' + esc(p.name) + '</figcaption></figure>';
-    }).join('');
-    // 只渲染本地图片：同步来的学生会带上远程 URL，加载不出来会变成裂图
-    const hallOk = s.hall && typeof s.hall.image === 'string' &&
-      (s.hall.image.indexOf('data:') === 0 || s.hall.image.indexOf('portraits/') === 0 || s.hall.image.indexOf('img/') === 0);
-    if (hallOk) {
-      html += '<figure style="grid-column:1/-1"><img loading="lazy" src="' + s.hall.image + '" style="height:220px" alt="">' +
-        '<figcaption>回忆大厅</figcaption></figure>';
+  /* -------------------------------------------------------- 语音试听 */
+
+  // 内置数据不带音频地址，第一次进「语音」页时向 WIKI 拉一份，之后走缓存
+  function loadVoiceAudio(s) {
+    if (!window.BASync || !window.BASync.voiceAudio) return;
+    if (state.voiceAudioLoading[s.id]) return;
+    state.voiceAudioLoading[s.id] = 1;
+    state.voiceAudioFor = s.id;
+    state.voiceAudio = null;
+    window.BASync.voiceAudio(s.id, s.contentId).then(function (map) {
+      delete state.voiceAudioLoading[s.id];
+      if (state.detail !== s.id) return;
+      state.voiceAudio = map || {};
+      if (state.detailTab === 'voice') rerenderBody();
+    });
+  }
+
+  const audioUrlCache = {};
+  let curAudio = null;
+  let curKey = '';
+
+  function stopVoice() {
+    const on = detailEl.querySelector('.vplay.on');
+    if (on) on.classList.remove('on');
+    if (curAudio) {
+      try { curAudio.pause(); } catch (e) { /* ignore */ }
+      curAudio = null;
     }
-    html += '</div>';
-    html += '<div style="margin-top:12px;font-size:11.5px;color:var(--sub);text-align:center">立绘已随 App 缓存，可离线查看</div>';
+    curKey = '';
+  }
+
+  // 音频从原生桥取（CDN 校验 Referer，网页侧拿不到），转成 Blob URL 播放
+  function resolveAudioUrl(url) {
+    if (audioUrlCache[url]) return Promise.resolve(audioUrlCache[url]);
+    if (!window.BAFetch || !window.BAFetch.available()) {
+      return Promise.reject(new Error('需要在 App 内联网播放'));
+    }
+    return window.BAFetch.b64(url, { Referer: 'https://www.gamekee.com/' }).then(function (b64) {
+      const bin = atob(b64 || '');
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const mime = /\.mp3$/i.test(url) ? 'audio/mpeg' : 'audio/ogg';
+      const obj = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      audioUrlCache[url] = obj;
+      return obj;
+    });
+  }
+
+  function playVoice(btn) {
+    const url = btn.dataset.url;
+    if (!url) return;
+    const key = btn.dataset.key + ':' + btn.dataset.lang;
+    if (curKey === key && curAudio) { stopVoice(); return; }
+    stopVoice();
+    curKey = key;
+    btn.classList.add('loading');
+    resolveAudioUrl(url).then(function (objUrl) {
+      btn.classList.remove('loading');
+      const a = new Audio(objUrl);
+      curAudio = a;
+      a.onended = function () {
+        btn.classList.remove('on');
+        if (curAudio === a) { curAudio = null; curKey = ''; }
+      };
+      btn.classList.add('on');
+      const p = a.play();
+      if (p && p.catch) p.catch(function () { btn.classList.remove('on'); stopVoice(); toast('播放失败，请重试'); });
+    }).catch(function (e) {
+      btn.classList.remove('loading');
+      curKey = '';
+      toast('语音加载失败：' + ((e && e.message) || '网络错误'));
+    });
+  }
+
+  /* ------------------------------------------------------- 影画鉴赏 */
+
+  const MEDIA_CATS = [
+    ['portraits', '立绘'],
+    ['intro', '官方介绍'],
+    ['lobby', '回忆大厅'],
+    ['stamps', '表情'],
+    ['artbookJp', '设定集·日'],
+    ['artbookTw', '设定集·繁中'],
+    ['tv', 'TV动画'],
+    ['derivative', '官方衍生'],
+    ['videos', '视频']
+  ];
+
+  const mediaBlob = {};     // url -> blob: 地址
+  const mediaLoading = {};  // url -> 1
+  const mediaDead = {};     // url -> 1（加载失败，别一直重试）
+
+  function mediaItems(s) {
+    const m = s.media || {};
+    if (!m.intro && s.officialImages) m.intro = s.officialImages;
+    if (!m.stamps && s.expressions) m.stamps = s.expressions;
+    return {
+      portraits: (s.portraits || []).map(function (p) { return { url: p.url, label: p.name, local: true }; }),
+      intro: (m.intro || []).map(function (u) { return { url: u, label: '官方介绍' }; }),
+      lobby: (m.lobby || []).map(function (u) { return { url: u, label: '回忆大厅' }; }),
+      stamps: (m.stamps || []).map(function (u) { return { url: u, label: '表情' }; }),
+      artbookJp: (m.artbookJp || []).map(function (u) { return { url: u, label: '设定集' }; }),
+      artbookTw: (m.artbookTw || []).map(function (u) { return { url: u, label: '设定集' }; }),
+      tv: (m.tv || []).map(function (u) { return { url: u, label: 'TV动画' }; }),
+      derivative: (m.derivative || []).map(function (u) { return { url: u, label: '官方衍生' }; }),
+      videos: (m.videos || []).map(function (v) { return { url: v.url, label: v.label, video: true }; })
+    };
+  }
+
+  // 远程素材要经过原生桥取（CDN 校验 Referer），转成 blob 再给 <img> / <video>
+  function mediaBlobUrl(url) {
+    if (mediaBlob[url]) return Promise.resolve(mediaBlob[url]);
+    if (mediaDead[url]) return Promise.reject(new Error('failed'));
+    if (!window.BAFetch || !window.BAFetch.available()) {
+      return Promise.reject(new Error('需在 App 内联网查看'));
+    }
+    const store = window.BASync && window.BASync.cache;
+    // 先查本地缓存，没有再联网拉取，拉到就顺手存盘（下次秒开、可离线）
+    return (store && store.available() ? store.get(url) : Promise.resolve('')).then(function (cached) {
+      if (cached) return cached;
+      return window.BAFetch.b64(url, { Referer: 'https://www.gamekee.com/' }).then(function (b64) {
+        // 大于约 9MB 的文件不缓存，避免把手机塞满
+        if (store && store.available() && b64 && b64.length < 12 * 1024 * 1024) {
+          store.set(url, b64);
+        }
+        return b64;
+      });
+    }).then(function (b64) {
+      const bin = atob(b64 || '');
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const mime = /\.mp4$/i.test(url) ? 'video/mp4'
+        : /\.webp$/i.test(url) ? 'image/webp'
+        : /\.jpe?g$/i.test(url) ? 'image/jpeg' : 'image/png';
+      const blob = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      mediaBlob[url] = blob;
+      return blob;
+    }).catch(function (e) {
+      mediaDead[url] = 1;
+      throw e;
+    });
+  }
+
+  // 渲染完再按需拉图：只加载滚动到视野内的，避免一进页面就下几 MB
+  let mediaIO = null;
+  const mediaQueue = [];
+  let mediaActive = 0;
+
+  function pumpMedia() {
+    while (mediaActive < 4 && mediaQueue.length) {
+      const img = mediaQueue.shift();
+      const url = img.dataset.murl;
+      if (!url || img.src) continue;
+      mediaActive++;
+      mediaBlobUrl(url).then(function (blob) {
+        img.src = blob;
+        img.removeAttribute('data-murl');
+        const ph = img.parentNode.querySelector('.mph');
+        if (ph) ph.remove();
+      }).catch(function () {
+        img.removeAttribute('data-murl');
+        const ph = img.parentNode.querySelector('.mph');
+        if (ph) ph.textContent = '加载失败';
+      }).then(function () {
+        mediaActive--;
+        pumpMedia();
+      });
+    }
+  }
+
+  function loadMediaImages() {
+    if (mediaIO) { mediaIO.disconnect(); mediaIO = null; }
+    mediaQueue.length = 0;
+    const nodes = Array.prototype.slice.call(detailEl.querySelectorAll('img[data-murl]'));
+    if (!nodes.length) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      nodes.forEach(function (n) { mediaQueue.push(n); });
+      pumpMedia();
+      return;
+    }
+    // .detail 本身是滚动容器，root 必须指向它，否则会一次性加载全部
+    mediaIO = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        mediaIO.unobserve(en.target);
+        mediaQueue.push(en.target);
+        pumpMedia();
+      });
+    }, { root: detailEl, rootMargin: '250px 0px' });
+    nodes.forEach(function (n) { mediaIO.observe(n); });
+  }
+
+  function openMediaViewer(url, isVideo) {
+    closeMediaViewer();
+    const root = document.createElement('div');
+    root.className = 'mv-root';
+    root.id = 'media-viewer';
+    root.innerHTML = '<div class="mv-backdrop" data-act="mclose"></div>' +
+      '<button class="mv-close" data-act="mclose" aria-label="关闭">✕</button>' +
+      '<div class="mv-body">' +
+        (isVideo
+          ? '<video id="mv-video" controls playsinline autoplay></video>'
+          : '<img id="mv-img" alt="">') +
+        '<div class="mv-hint">点击空白处关闭</div>' +
+      '</div>';
+    document.body.appendChild(root);
+    requestAnimationFrame(function () { root.classList.add('open'); });
+    const el = root.querySelector(isVideo ? '#mv-video' : '#mv-img');
+    const ph = document.createElement('div');
+    ph.className = 'mv-loading';
+    ph.textContent = isVideo ? '视频下载中…' : '加载中…';
+    root.querySelector('.mv-body').appendChild(ph);
+    mediaBlobUrl(url).then(function (blob) {
+      ph.remove();
+      el.src = blob;
+      if (isVideo) { const p = el.play(); if (p && p.catch) p.catch(function () {}); }
+    }).catch(function (e) {
+      ph.textContent = '加载失败：' + ((e && e.message) || '网络错误');
+    });
+  }
+
+  function closeMediaViewer() {
+    const root = document.getElementById('media-viewer');
+    if (!root) return;
+    const v = root.querySelector('video');
+    if (v) { try { v.pause(); } catch (e) { /* ignore */ } }
+    root.classList.remove('open');
+    setTimeout(function () { if (root.parentNode) root.parentNode.removeChild(root); }, 220);
+  }
+
+  function mediaTab(s) {
+    const items = mediaItems(s);
+    const cats = MEDIA_CATS.filter(function (c) { return (items[c[0]] || []).length; });
+    if (!cats.length) return '<div class="empty">暂无鉴赏素材</div>';
+    if (!state.mediaCat || !items[state.mediaCat] || !items[state.mediaCat].length) {
+      state.mediaCat = cats[0][0];
+    }
+    const list = items[state.mediaCat] || [];
+
+    let html = '<div style="height:14px"></div>';
+    html += '<div class="voice-cat">' + cats.map(function (c) {
+      return '<button class="chip ' + (c[0] === state.mediaCat ? 'on' : '') + '" data-act="mcat" data-c="' + c[0] + '">' +
+        esc(c[1]) + '<span style="opacity:.6;font-weight:600">' + items[c[0]].length + '</span></button>';
+    }).join('') + '</div>';
+
+    // 大图类（官方介绍/回忆大厅/设定集/TV动画/官方衍生）单列整幅显示，表情走两列
+    const single = ['intro', 'lobby', 'artbookJp', 'artbookTw', 'tv', 'derivative'].indexOf(state.mediaCat) >= 0;
+    const gridCls = single ? ' single' : (state.mediaCat === 'portraits' ? '' : ' fit');
+    html += '<div class="mgallery' + gridCls + '">' + list.map(function (it, i) {
+      if (it.video) {
+        return '<button class="mcard vid" data-act="mplay" data-url="' + esc(it.url) + '" data-label="' + esc(it.label) + '">' +
+          '<span class="vplaymask">▶</span><span class="mlabel">' + esc(it.label) + '</span></button>';
+      }
+      if (it.local) {
+        return '<figure class="mcard"><img loading="lazy" src="' + it.url + '" alt=""><figcaption>' + esc(it.label) + '</figcaption></figure>';
+      }
+      return '<figure class="mcard" data-act="mview" data-url="' + esc(it.url) + '">' +
+        '<div class="mph"><span class="mspin"></span></div>' +
+        '<img data-murl="' + esc(it.url) + '" alt="">' +
+        '</figure>';
+    }).join('') + '</div>';
+
+    html += '<div class="netnote">' +
+      (state.mediaCat === 'portraits'
+        ? '立绘已随 App 缓存，离线可看'
+        : '此类素材首次查看需联网，加载后自动缓存到本地，之后可离线查看') +
+      '</div>';
+
+    setTimeout(loadMediaImages, 0);
     return html;
   }
 
@@ -838,7 +1167,11 @@
   function rerenderBody() {
     if (state.detail) {
       const s = STUDENTS[state.detail];
+      const body = detailEl.querySelector('.detail-body');
+      const y = body ? body.scrollTop : 0;
       detailEl.innerHTML = detailHTML(s);
+      const next = detailEl.querySelector('.detail-body');
+      if (next && y) next.scrollTop = y;
     } else {
       render();
     }
@@ -857,6 +1190,8 @@
 
   function closeDetail() {
     if (!state.detail) return;
+    stopVoice();
+    closeMediaViewer();
     detailEl.classList.remove('in');
     state.detail = null;
     render();
@@ -1019,6 +1354,18 @@
       });
       return;
     }
+    if (act === 'cache-clear') {
+      if (!window.BASync || !window.BASync.cache || !window.BASync.cache.available()) { toast('需在 App 内使用'); return; }
+      window.BASync.cache.clear().then(function (ok) {
+        Object.keys(mediaBlob).forEach(function (k) { delete mediaBlob[k]; });
+        Object.keys(mediaDead).forEach(function (k) { delete mediaDead[k]; });
+        state.cacheSizeText = '0 MB';
+        const el = document.getElementById('cache-size');
+        if (el) el.textContent = '0 MB';
+        toast(ok ? '缓存已清理' : '清理失败');
+      });
+      return;
+    }
     if (act === 'check-update') {
       const el = document.getElementById('update-status');
       if (el) el.textContent = '检查中…';
@@ -1043,9 +1390,15 @@
       if (target) target.scrollIntoView({ block: 'start' });
       return;
     }
-    if (act === 'dt') { state.detailTab = btn.dataset.t; state.voiceCat = null; rerenderBody(); detailEl.scrollTop = 0; return; }
+    if (act === 'dt') { stopVoice(); closeMediaViewer(); state.detailTab = btn.dataset.t; state.voiceCat = null; rerenderBody(); detailEl.scrollTop = 0; return; }
     if (act === 'lv') { state.skillLv[btn.dataset.i] = Number(btn.dataset.lv); rerenderBody(); return; }
-    if (act === 'vcat') { state.voiceCat = btn.dataset.c; rerenderBody(); return; }
+    if (act === 'vcat') { stopVoice(); state.voiceCat = btn.dataset.c; rerenderBody(); return; }
+    if (act === 'vtrans') { state.voiceTrans = btn.dataset.m; rerenderBody(); return; }
+    if (act === 'vplay') { playVoice(btn); return; }
+    if (act === 'mcat') { state.mediaCat = btn.dataset.c; rerenderBody(); return; }
+    if (act === 'mview') { openMediaViewer(btn.dataset.url, false); return; }
+    if (act === 'mplay') { openMediaViewer(btn.dataset.url, true); return; }
+    if (act === 'mclose') { closeMediaViewer(); return; }
   });
 
   // --------------------------------------------------------------- search

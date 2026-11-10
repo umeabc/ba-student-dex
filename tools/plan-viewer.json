@@ -1,0 +1,21 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "MW1-open", "wait": 2500, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"148495\"]').click();document.querySelector('[data-act=dt][data-t=media]').click();var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('官方介绍')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "MW2-viewer", "after": 5000, "wait": 200,
+      "js": "(function(){var f=document.querySelector('.mcard[data-act=mview]');f.click();return 'opened'})()" },
+    { "name": "MW3-hit", "after": 2000, "wait": 200,
+      "js": "(function(){var pts=[[12,300],[370,300],[195,60]];return pts.map(function(p){var el=document.elementFromPoint(p[0],p[1]);return p.join(',')+' -> '+(el?(el.className||el.tagName):'null')})})()" },
+    { "name": "MW4-tap-blank", "after": 300, "wait": 100,
+      "js": "(function(){var el=document.elementFromPoint(12,300);if(!el)return{noEl:true};el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:12,clientY:300}));return {clickedOn:el.className||el.tagName}})()" },
+    { "name": "MW5-closed", "after": 600, "wait": 100,
+      "js": "(function(){return {viewerGone:!document.getElementById('media-viewer'),errs:window.__errs}})()" },
+    { "name": "MW6-close-btn", "after": 300, "wait": 100,
+      "js": "(function(){var f=document.querySelector('.mcard[data-act=mview]');f.click();setTimeout(function(){var b=document.querySelector('.mv-close');if(b)b.click()},800);return 'ok'})()" },
+    { "name": "MW7-after-btn", "after": 1600, "wait": 100,
+      "js": "(function(){return {viewerGone:!document.getElementById('media-viewer'),errs:window.__errs}})()" }
+  ]
+}

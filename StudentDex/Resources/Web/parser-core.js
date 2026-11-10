@@ -69,6 +69,34 @@
     return '';
   }
 
+  // 取某列的音频地址（WIKI 的语音单元格 type = 'audio'）
+  function audioOf(row, i) {
+    if (!row) return '';
+    for (var k = 0; k < row.length; k++) {
+      if (row[k].c === i && row[k].t === 'audio') return url(row[k].v);
+    }
+    return '';
+  }
+
+  // 语音表所在行范围与分类（同一套模板里位置固定）
+  var VOICE_CATS = { '通常': 1, '大厅及咖啡馆': 1, '好感度': 1, '战斗': 1, '成长': 1, '事件': 1, '活动': 1 };
+
+  // 从行数据里抽取「分类|标题 -> [日配, 中配, 韩配]」的音频表
+  function extractVoiceAudio(rows) {
+    var out = {};
+    var h = helpers(rows);
+    for (var i = 295; i <= 447; i++) {
+      var cat = h.col(rows[i], 0);
+      var lb = h.col(rows[i], 1);
+      if (!cat || !lb || !VOICE_CATS[cat]) continue;
+      var jp = audioOf(rows[i], 4);
+      var cn = audioOf(rows[i], 6);
+      var kr = audioOf(rows[i], 7);
+      if (jp || cn || kr) out[cat + '|' + lb] = [jp, cn, kr];
+    }
+    return out;
+  }
+
   function hashOfUrl(u) {
     if (!URL_HASH || !u) return '';
     var h = URL_HASH[u];
@@ -307,18 +335,33 @@
       s.sameName.push({ name: nm, icon: imgOf(rows[q4]), url: link });
     }
 
-    // 语音
+    // 语音：日文原文 + 官翻(第 5 列) / 民翻(第 3 列)，另存三语试听地址
     var voices = {};
+    var voiceAudio = {};
     for (var q5 = 295; q5 <= 447; q5++) {
       var cat = col(rows[q5], 0);
       var lb = col(rows[q5], 1);
-      if (!cat || !lb) continue;
+      if (!cat || !lb || !VOICE_CATS[cat]) continue;
       var jp = col(rows[q5], 2);
-      var zh = col(rows[q5], 5) || col(rows[q5], 3);
-      if (!jp && !zh) continue;
-      (voices[cat] = voices[cat] || []).push({ label: lb, jp: jp, zh: zh });
+      var fan = col(rows[q5], 3);   // 民间翻译
+      var off = col(rows[q5], 5);   // 官方翻译，没有官方时为空
+      var aJp = audioOf(rows[q5], 4);
+      var aCn = audioOf(rows[q5], 6);
+      var aKr = audioOf(rows[q5], 7);
+      if (!jp && !fan && !off && !aJp && !aCn && !aKr) continue;
+      (voices[cat] = voices[cat] || []).push({ label: lb, jp: jp, fan: fan, off: off });
+      if (aJp || aCn || aKr) voiceAudio[cat + '|' + lb] = [aJp, aCn, aKr];
     }
     s.voices = voices;
+    s.voiceAudio = voiceAudio;
+
+    // 声优（日 / 中 / 韩），形如「日 | 藤井ゆきよ\n中 | 陈婷婷\n韩 | 김이안（金怡侒）」
+    s.cv = { jp: '', cn: '', kr: '' };
+    String(col(rows[251], 1) || '').split(/\n/).forEach(function (line) {
+      var m = line.match(/^\s*(日|中|韩)\s*[|｜]\s*(.+?)\s*$/);
+      if (!m) return;
+      s.cv[m[1] === '日' ? 'jp' : (m[1] === '中' ? 'cn' : 'kr')] = m[2];
+    });
 
     // 数值
     s.stats = {
@@ -370,13 +413,47 @@
       s.review.tiers.push({ name: lq2, value: col(rows[q7], 2), icon: imgOf(rows[q7]) });
     }
 
-    // 媒体
-    s.officialImages = [];
-    for (var q8 = 450; q8 <= 453; q8++) {
-      var ci = (rows[q8] || []).filter(function (c) { return c.t === 'i'; })[0];
-      if (ci) s.officialImages.push(url(ci.v));
+    // 影画鉴赏：官方介绍 / 回忆大厅 / 表情 / 设定集 / TV动画 / 官方衍生 / 视频
+    function imgs(rowIdx) {
+      var r = rows[rowIdx] || [];
+      var out = [];
+      r.forEach(function (c) {
+        if (c.t === 'i') out.push(url(c.v));
+        else if (c.t === 'imageset') {
+          String(c.v || '').split(',').forEach(function (u) { if (u) out.push(url(u)); });
+        }
+      });
+      return out.filter(Boolean);
     }
-    s.expressions = (rows[456] || []).slice(1).map(function (c) { return c.v; }).filter(Boolean).map(url);
+    function videos(rowIdx, name) {
+      var r = rows[rowIdx] || [];
+      var out = [];
+      r.forEach(function (c) {
+        if (c.t === 'video' && c.v) out.push({ label: name || '视频', url: url(c.v) });
+      });
+      return out;
+    }
+
+    s.media = {
+      intro: imgs(450).concat(imgs(451), imgs(452), imgs(453)),   // 官方介绍
+      lobby: imgs(26),                                            // 回忆大厅（静态图）
+      stamps: imgs(456),                                          // 角色表情
+      artbookJp: imgs(461),                                       // 设定集（日语）
+      artbookTw: imgs(462),                                       // 设定集（繁中）
+      tv: imgs(463),                                              // TV动画设定图
+      derivative: imgs(465).concat(imgs(468), imgs(469), imgs(470), imgs(471), imgs(472),
+        imgs(473), imgs(474), imgs(475), imgs(476), imgs(477), imgs(478), imgs(479),
+        imgs(480), imgs(481), imgs(482), imgs(483), imgs(484), imgs(486)),  // 官方衍生 / 本家画
+      videos: videos(489, '角色演示')
+        .concat(videos(490, 'PV'), videos(491, 'PV'), videos(492, 'PV'), videos(493, 'PV'))
+        .concat(videos(494, '回忆大厅视频'), videos(495, '回忆大厅视频'))
+        .concat(videos(496, '独家记忆（中）'), videos(497, '独家记忆（日）'))
+        .concat(videos(498, 'Live'), videos(499, 'Live'), videos(500, 'Live'))
+    };
+
+    // 兼容旧字段
+    s.officialImages = s.media.intro.slice();
+    s.expressions = s.media.stamps.slice();
 
     return s;
   }
@@ -421,6 +498,7 @@
     parseStudent: parseStudent,
     compactRows: compactRows,
     summarize: summarize,
-    setIconMap: setIconMap
+    setIconMap: setIconMap,
+    extractVoiceAudio: extractVoiceAudio
   };
 });
