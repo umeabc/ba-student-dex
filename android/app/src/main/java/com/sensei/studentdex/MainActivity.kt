@@ -59,6 +59,13 @@ class MainActivity : ComponentActivity() {
             // target=_blank / window.open must be captured so we can hand it to the browser.
             setSupportMultipleWindows(true)
         }
+        // APK links arrive as downloads, not navigations, so shouldOverrideUrlLoading
+        // never sees them. Route *.apk downloads to the updater (installer launch).
+        webView.setDownloadListener { url, _, _, mimetype, _ ->
+            if (url.endsWith(".apk", ignoreCase = true) ||
+                mimetype == "application/vnd.android.package-archive"
+            ) downloadUpdate(url)
+        }
         webView.setBackgroundColor(Color.TRANSPARENT)
         webView.isVerticalScrollBarEnabled = false
         webView.webChromeClient = object : WebChromeClient() {
