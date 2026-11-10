@@ -1,17 +1,14 @@
 /*
- * update.js — 检查 GitHub Release 是否有新版本。
- *
- * 走原生桥（和 sync.js 共用 BAFetch）避免 file:// 页面的跨域问题；
- * 浏览器预览时退化为普通 fetch（GitHub API 允许 * 跨域）。
- *
- * 只用 `/releases/latest`：它本身就排除了 draft 与 prerelease。
+ * update.js — 检查 GitHub 的 Android Release 是否有新版本。
+ * 原生桥避免 WebView 跨域限制；浏览器预览退化为普通 fetch。
  */
 (function (root) {
   'use strict';
 
-  var REPO = 'MilkTea0329/ba-student-dex';
-  var API = 'https://api.github.com/repos/' + REPO + '/releases/latest';
+  var REPO = 'umeabc/ba-student-dex';
+  var API = 'https://api.github.com/repos/' + REPO + '/releases?per_page=30';
   var TIMEOUT = 15000;
+  var TAG = /^android-v(\d+\.\d+\.\d+)$/;
 
   function parseVer(v) {
     var s = String(v == null ? '' : v).replace(/^\s*v/i, '');
@@ -46,7 +43,7 @@
     });
   }
 
-  function fetchLatest() {
+  function fetchReleases() {
     if (root.BAFetch && root.BAFetch.available()) {
       return root.BAFetch.json(API, { Accept: 'application/vnd.github+json' });
     }
@@ -57,14 +54,30 @@
       });
   }
 
-  /**
-   * @param {string} currentVersion 形如 "V1.0.0"
-   * @returns {Promise<{ok:boolean, hasUpdate:boolean, latest?:string, url?:string, notes?:string, name?:string, error?:string}>}
-   */
+  function selectLatest(releases) {
+    if (!Array.isArray(releases)) return null;
+    var best = null;
+    var bestApk = null;
+    releases.forEach(function (rel) {
+      if (!rel || !TAG.test(String(rel.tag_name || '')) || !Array.isArray(rel.assets)) return;
+      var apk = rel.assets.find(function (asset) {
+        return asset && typeof asset.name === 'string' && /\.apk$/i.test(asset.name) && asset.browser_download_url;
+      });
+      if (apk && (!best || isNewer(rel.tag_name, best.tag_name))) {
+        best = rel;
+        bestApk = apk;
+      }
+    });
+    return best ? { release: best, apk: bestApk } : null;
+  }
+
+  /** @param {string} currentVersion 形如 "V1.0.0" */
   function check(currentVersion) {
-    return withTimeout(fetchLatest(), TIMEOUT)
-      .then(function (rel) {
-        if (!rel || !rel.tag_name) return { ok: false, error: 'bad-response' };
+    return withTimeout(fetchReleases(), TIMEOUT)
+      .then(function (releases) {
+        var selected = selectLatest(releases);
+        if (!selected) return { ok: false, error: 'no-android-release' };
+        var rel = selected.release;
         var latest = rel.tag_name;
         return {
           ok: true,
@@ -73,7 +86,7 @@
           current: currentVersion,
           name: rel.name || latest,
           notes: rel.body || '',
-          url: rel.html_url || ('https://github.com/' + REPO + '/releases/tag/' + latest),
+          url: selected.apk.browser_download_url,
           publishedAt: rel.published_at || ''
         };
       })

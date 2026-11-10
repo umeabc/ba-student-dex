@@ -18,11 +18,11 @@ android {
         applicationId = "com.sensei.studentdex"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.1"
+        versionCode = 2
+        versionName = "1.0.2"
     }
     sourceSets["main"].assets.srcDir("../../web")
-    sourceSets["main"].assets.exclude("_test*.html")
+    sourceSets["main"].assets.exclude("_test*.html", "avatars/**", "img/**", "portraits/**")
     buildFeatures { buildConfig = false }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -49,7 +49,7 @@ android {
     androidResources {
         noCompress += listOf("js", "css", "html", "json")
         // AGP's asset merger uses this filter rather than SourceDirectorySet excludes.
-        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:_test.html:_test-update.html"
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:_test.html:_test-update.html:avatars:img:portraits"
     }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }

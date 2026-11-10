@@ -500,4 +500,21 @@
   }
 
   root.BASync.cache = { get: cacheGet, set: cacheSet, size: cacheSize, clear: cacheClear, available: hasBridge };
+
+  /* ------------------------------------------------------------ 图片预取 */
+  function parsePrefetch(r) {
+    try {
+      if (r.status !== 200) throw new Error('http-' + r.status);
+      return JSON.parse(decoder ? decoder.decode(r.bytes) : '');
+    } catch (e) {
+      return { running: false, scope: 'basic', done: 0, total: 0, failed: 0, bytes: 0 };
+    }
+  }
+
+  root.BASync.prefetch = {
+    start: function (scope) { return rpc({ op: 'prefetch', action: 'start', scope: scope || 'basic' }).then(parsePrefetch); },
+    status: function () { return rpc({ op: 'prefetch', action: 'status' }).then(parsePrefetch); },
+    cancel: function () { return rpc({ op: 'prefetch', action: 'cancel' }).then(parsePrefetch); },
+    available: hasBridge
+  };
 })(typeof window !== 'undefined' ? window : this);

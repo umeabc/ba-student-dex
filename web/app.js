@@ -3,7 +3,7 @@
   'use strict';
 
   const APP_NAME = '什亭之匣';
-  const APP_VERSION = 'V1.0.1';
+  const APP_VERSION = 'V1.0.2';
 
   // 内置数据（打包进 App），联网同步到的新学生会追加到这里
   const INDEX = (window.BA_INDEX || []).slice();
@@ -53,6 +53,7 @@
     mediaCat: null,           // 影画鉴赏当前分类
     sheetOpen: false,
     draft: null,
+    prefetch: { phase: 'idle', running: false, scope: 'basic', done: 0, total: 0, failed: 0, bytes: 0 },
   };
 
   /* ------------------------------------------------------------- helpers */
@@ -361,8 +362,92 @@
       String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
 
+  let prefetchTimer = null;
+  let prefetchConfirmScope = null;
+  let prefetchConfirmUntil = 0;
+  let prefetchConfirmTimer = null;
+
+  function prefetchAvailable() {
+    return /Android/i.test(navigator.userAgent) && window.BASync && window.BASync.prefetch &&
+      window.BASync.prefetch.available();
+  }
+
+  function prefetchRowHTML(scope) {
+    const p = state.prefetch;
+    const basic = scope === 'basic';
+    const total = basic ? 3366 : 3877;
+    const mb = (p.bytes / 1024 / 1024).toFixed(1);
+    let title = basic ? '头像与图标' : '全部图片（含立绘）';
+    let subtitle = basic ? '3366 张 · 约 175MB 流量，缓存约 135MB' : '3877 张 · 约 500MB 流量，缓存约 165MB · 建议 Wi-Fi';
+    let action = 'prefetch-start';
+    let button = '下载';
+    const disabled = p.running && p.scope !== scope;
+    if (p.running && p.scope === scope) {
+      title = '已缓存 ' + p.done + ' / ' + (p.total || total) + ' · ' + mb + 'MB';
+      subtitle = (p.phase === 'cancel' ? '正在取消 · ' : '') + '可离开此页，下载将在后台继续';
+      action = 'prefetch-cancel';
+      button = p.phase === 'cancel' ? '取消中…' : '取消';
+    } else if (!p.running && p.scope === scope && p.phase === 'done') {
+      title = '已缓存 ' + p.done + ' 张 · ' + mb + 'MB' + (p.failed ? ' · 失败 ' + p.failed : '');
+      subtitle = '已缓存图片会跳过，失败项目可重试';
+    } else if (!p.running && p.scope === scope && p.phase === 'cancel') {
+      title = '已取消 · 已缓存 ' + p.done + ' 张 · ' + mb + 'MB';
+      subtitle = '继续时会跳过已缓存图片';
+    } else if (!basic && prefetchConfirmScope === 'all') {
+      button = '再点一次确认 500MB';
+    }
+    return '<button class="rowlink" data-act="' + action + '" data-scope="' + scope + '"' +
+      (disabled ? ' disabled' : '') + ' style="width:100%;text-align:left">' +
+      '<span>' + title + '<br><small style="color:var(--sub)">' + subtitle + '</small></span>' +
+      '<span class="r">' + button + '</span></button>';
+  }
+
+  function prefetchHTML() {
+    return prefetchRowHTML('basic') + prefetchRowHTML('all');
+  }
+
+  function renderPrefetch() {
+    const el = document.getElementById('prefetch-block');
+    if (el) el.innerHTML = prefetchHTML();
+  }
+
+  function stopPrefetchPolling() {
+    if (prefetchTimer !== null) { clearInterval(prefetchTimer); prefetchTimer = null; }
+  }
+
+  function pollPrefetch() {
+    if (state.tab !== 'more' || state.detail || !prefetchAvailable()) { stopPrefetchPolling(); return; }
+    window.BASync.prefetch.status().then(function (st) {
+      if (state.tab !== 'more' || state.detail) return;
+      const p = state.prefetch;
+      const wasActive = p.running || p.phase === 'running' || p.phase === 'cancel';
+      p.running = !!st.running;
+      p.scope = st.scope === 'all' ? 'all' : 'basic';
+      p.done = st.done || 0;
+      p.total = st.total || 0;
+      p.failed = st.failed || 0;
+      p.bytes = st.bytes || 0;
+      if (p.running) {
+        if (prefetchTimer === null) prefetchTimer = setInterval(pollPrefetch, 800);
+        if (p.phase !== 'cancel') p.phase = 'running';
+      } else if (wasActive) {
+        if (p.phase !== 'cancel') p.phase = p.total > 0 && p.done + p.failed >= p.total ? 'done' : 'idle';
+        stopPrefetchPolling();
+        refreshCacheSize();
+      }
+      renderPrefetch();
+    }).catch(function () { /* 保留当前进度，下一次轮询重试 */ });
+  }
+
+  function startPrefetchPolling() {
+    if (state.tab !== 'more' || state.detail || !prefetchAvailable()) return;
+    if (prefetchTimer === null) prefetchTimer = setInterval(pollPrefetch, 800);
+    pollPrefetch();
+  }
+
   function moreView() {
     setTimeout(refreshCacheSize, 0);
+    if (prefetchAvailable()) setTimeout(pollPrefetch, 0);
     const schools = uniq(INDEX.map(function (s) { return s.school; })).length;
     const r3 = INDEX.filter(function (s) { return s.rarity === 3; }).length;
     const strikes = INDEX.filter(function (s) { return s.tactic === 'STRIKER'; }).length;
@@ -380,6 +465,8 @@
         '<div class="rowlink"><span>上次检查</span><span class="r">' + lastCheckText() + '</span></div>' +
         '<div class="rowlink"><span>自动检查</span><span class="r">每次启动 · 30 分钟内不重复</span></div>' +
       '</div>' +
+      (prefetchAvailable() ?
+        '<div class="section-title">离线资源</div><div class="panel" id="prefetch-block">' + prefetchHTML() + '</div>' : '') +
       '<div class="section-title">关于</div>' +
       '<div class="panel">' +
         '<div class="rowlink"><span>应用名称</span><span class="r">' + esc(APP_NAME) + '</span></div>' +
@@ -1147,6 +1234,7 @@
   }
 
   function render() {
+    if (state.tab !== 'more' || state.detail) stopPrefetchPolling();
     chrome();
     if (state.detail) {
       const s = STUDENTS[state.detail];
@@ -1352,6 +1440,68 @@
         }
         if (!state.detail) render();
       });
+      return;
+    }
+    if (act === 'prefetch-start') {
+      if (!prefetchAvailable()) { toast('一键下载需在 Android App 内使用'); return; }
+      const scope = btn.dataset.scope === 'all' ? 'all' : 'basic';
+      if (state.prefetch.running) return;
+      if (scope === 'all' && (prefetchConfirmScope !== 'all' || Date.now() > prefetchConfirmUntil)) {
+        prefetchConfirmScope = 'all';
+        prefetchConfirmUntil = Date.now() + 5000;
+        if (prefetchConfirmTimer !== null) clearTimeout(prefetchConfirmTimer);
+        prefetchConfirmTimer = setTimeout(function () {
+          if (prefetchConfirmScope === 'all' && Date.now() >= prefetchConfirmUntil) {
+            prefetchConfirmScope = null;
+            renderPrefetch();
+          }
+        }, 5000);
+        renderPrefetch();
+        return;
+      }
+      prefetchConfirmScope = null;
+      if (prefetchConfirmTimer !== null) { clearTimeout(prefetchConfirmTimer); prefetchConfirmTimer = null; }
+      state.prefetch.phase = 'running';
+      state.prefetch.running = true;
+      state.prefetch.scope = scope;
+      renderPrefetch();
+      window.BASync.prefetch.start(scope).then(function (st) {
+        if (st.error === 'space') {
+          state.prefetch.phase = 'idle';
+          state.prefetch.running = false;
+          stopPrefetchPolling();
+          renderPrefetch();
+          toast('空间不足（需 300MB 以上）');
+          return;
+        }
+        state.prefetch.running = !!st.running;
+        state.prefetch.scope = st.scope === 'all' ? 'all' : 'basic';
+        state.prefetch.done = st.done || 0;
+        state.prefetch.total = st.total || 0;
+        state.prefetch.failed = st.failed || 0;
+        state.prefetch.bytes = st.bytes || 0;
+        if (st.running) {
+          startPrefetchPolling();
+        } else {
+          state.prefetch.phase = st.total > 0 && state.prefetch.done + state.prefetch.failed >= st.total ? 'done' : 'idle';
+          stopPrefetchPolling();
+          refreshCacheSize();
+          renderPrefetch();
+        }
+      }).catch(function () {
+        state.prefetch.phase = 'idle';
+        state.prefetch.running = false;
+        stopPrefetchPolling();
+        renderPrefetch();
+        toast('下载失败，请重试');
+      });
+      return;
+    }
+    if (act === 'prefetch-cancel') {
+      if (state.prefetch.phase === 'cancel') return;
+      state.prefetch.phase = 'cancel';
+      renderPrefetch();
+      window.BASync.prefetch.cancel().then(pollPrefetch).catch(function () { pollPrefetch(); });
       return;
     }
     if (act === 'cache-clear') {

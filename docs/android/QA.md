@@ -1,8 +1,7 @@
-# Android 端复核与真机（模拟器）验证报告
+# Android 端复核与验证报告（1.0.2）
 
-- 复核对象：`android/`（Codex 实现）、`docs/android/{PLAN,DESIGN,REVIEW}.md`
-- 验证环境：雷电模拟器 LDPlayer14，Android 14（API 34），系统 WebView 146，900×1600 @320dpi（dpr=2，CSS 视口 450×800）
-- 结论：**可安装、可离线运行，功能与 iOS 1.0.1 对齐**；debug 签名产物，仅用于测试分发。
+- 验证环境：雷电模拟器 LDPlayer14，Android 14（API 34），系统 WebView 146，900×1600 @320dpi（dpr=2）
+- 结论：**1.0.2 可安装、可离线（缓存后）、支持应用内更新**；release 签名产物已发布。
 
 ---
 
@@ -10,87 +9,69 @@
 
 | 项 | 值 |
 | --- | --- |
-| APK | `dist/StudentDex-1.0.1-android-debug.apk`（`android/app/build/outputs/apk/debug/app-debug.apk` 的副本） |
-| 体积 | 52,769,590 字节（约 50.3 MiB） |
-| SHA-256 | `f3a21716c5214e6579a92e264427f2caa97c3a8a3e0fa6fdcf7abefa4f6f6825` |
-| 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.1`、versionCode `1` |
+| Release APK | `dist/StudentDex-1.0.2-android.apk`（14,219,699 字节） |
+| SHA-256 | `105cd8fdcf66e715b97668a476dbc147a6ba256689832d346f581be7dc4b5a5b` |
+| 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.2`、versionCode `2` |
 | SDK | minSdk 24，targetSdk 35，compileSdk 35 |
-| 标签 | 什亭之匣（launcher 图标来自 `web/icon.png`，5 档 mipmap） |
-| 签名 | Gradle 默认 debug keystore（**不可上架/长期分发**） |
+| 签名 | release keystore（`CN=StudentDex, OU=Android, O=StudentDex`），APK Signature Scheme v2 |
 
-**发布用 release 包**：`dist/StudentDex-1.0.1-android.apk`（52,491,120 字节，SHA-256 `61e2642adf9634f703dc07aeaad5856e7d635c35097667dcf95dd900347a6185`），
-使用独立 release keystore 签名（`CN=StudentDex, OU=Android, O=StudentDex`，证书 SHA-256 `63ea77e9fa7921dd03bffcecf22694a66505d2c785ea14e1db272ff89149c681`），
-已上传 GitHub Release `android-v1.0.1`。上表体积/SHA 指 debug 包。
+APK 只含核心页面（`index.html`/`app.js`/`styles.css`/`data.js`/`asset-map.json`），图片不打包。
 
-## 2. 构建与安装（本机复现）
+## 2. 构建
 
 ```bash
-# 构建（Gradle 8.14.5 + AGP 8.7.3 + Kotlin 2.0.21 + JDK 21）
 cd android
-D:/harness/.build-env/gradle-8.14.5/bin/gradle.bat :app:assembleDebug
-
-# 安装并启动（雷电）
-D:/leidian/LDPlayer14/adb.exe install -r app/build/outputs/apk/debug/app-debug.apk
-D:/leidian/LDPlayer14/adb.exe shell am start -n com.sensei.studentdex/.MainActivity
+D:/harness/.build-env/gradle-8.14.5/bin/gradle.bat :app:assembleRelease
+D:/leidian/LDPlayer14/adb.exe install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-`android/local.properties` 指向本机 SDK（`D:/harness/.build-env/android-sdk`），已 gitignore。
-
-## 3. 验证矩阵（LDPlayer14 / Android 14 / WebView 146 实测）
+## 3. 验证矩阵（模拟器实测）
 
 | # | 项 | 动作 | 结果 |
 | --- | --- | --- | --- |
-| 1 | 冷启动 | `am start -W`（force-stop 后） | `TotalTime 1277ms`；281 张卡片可交互约 4–5s |
-| 2 | 学生列表 | 打开 App | 281/281，头像全部本地加载 |
-| 2.1 | 触摸滚动 | 手指上/下滑动列表 | 跟手滚动、惯性正常；顶栏 sticky、底栏固定；`scrollWidth == clientWidth` 无横向溢出；筛选面板打开时滚动锁定，关闭后恢复 |
-| 3 | 搜索 | 输入「白子」 | 4 条命中（白子 / 白子*恐怖 等） |
-| 4 | 筛选面板 | 点「筛选」 | 8 个维度、底部安全区留白正确；返回键关闭面板且不退出 |
-| 5 | 学院 | 学院 Tab | 16 张学院卡；点入首个学院 → 56 名学生 |
-| 6 | 详情 | 点卡片 | 7 个 Tab（概览/技能/属性/养成/资料/语音/立绘）全部渲染 |
-| 7 | 立绘 | 立绘 Tab | 20MB portraits 资源正常显示（默认/无眼镜两张） |
-| 8 | 收藏持久化 | 收藏 → `force-stop` → 重启 | `localStorage ba.dex.favs` = `[225984]`，重启后仍在 |
-| 9 | 返回键 · 详情 | `input keyevent 4` | `#detail.in` 关闭，停留列表 |
-| 10 | 返回键 · 根 | 再按返回 | 回到桌面（Activity finish）；进程被系统缓存 |
-| 11 | 安全区 | CDP 读 `--safe-t/--safe-b` | `--safe-t: 24px`（状态栏 24dp，已按 density 换算）；`--safe-b: 0px`（本模拟器不占导航栏） |
-| 12 | 深色模式 | `cmd uimode night yes/no` | 页面/状态栏图标/窗口背景同步切换，`matchMedia` 与内联变量均为深色，**无重载、无闪烁** |
-| 13 | 页面 origin | CDP | `https://appassets.androidplatform.net`（安全源，localStorage 可持久） |
-| 14 | 桥存活性 | CDP | `window.webkit.messageHandlers.ba` 存在，`__baRPC` 为 function，注入早于 `sync.js` |
-| 15 | 桥 store | postMessage save/load | 落盘 `files/ba-sync-store.json`，内容与 JS 传入一致；load 回 200 + 原字节 |
-| 16 | 桥 fetch · 白名单外 | `https://evil.example.com` | `status=0`、空 body（拒绝，未发请求） |
-| 17 | 桥 fetch · GitHub | `api.github.com/.../releases/latest` | `status=200`，base64 正文可解析；`BAUpdate.check('V1.0.1')` → `hasUpdate:false` |
-| 18 | 外链（target=_blank） | 资料 Tab「实装学生图鉴」真实点击 | 系统浏览器打开，App 停留原页（`onCreateWindow` 捕获） |
-| 18.1 | 数据同步（真实） | 联网启动等待自动同步 | `files/ba-sync-store.json` 落盘 1.6MB 真实数据（含「真琴(泳装)」等未内置词条）；重启后列表出现「更新」角标 |
-| 19 | 离线 | CDP `Network.emulateNetworkConditions(offline)` | 281 张卡片与图片仍正常（资源全在包内）；同步失败仅影响「更多」页状态文案 |
-| 20 | 内存 | `dumpsys meminfo` | 主进程 PSS ≈ 101MB；渲染进程 RSS ≈ 260MB（56MB 资源 + 281 图） |
-| 21 | 构建可重复 | 清理后重编 | BUILD SUCCESSFUL，APK 内 `assets/index.html`（无 `assets/web/` 多一层） |
-| 22 | 应用图标 | 桌面查看 | 自适应图标（`mipmap-anydpi-v26`，蓝底 `#218AD6` + 角色前景 66% 安全区），圆角遮罩下完整；旧版图标同源生成 |
+| 1 | 冷启动 | force-stop 后 `am start -W` | 1.0–1.7s 显示列表 |
+| 2 | 图片按需回源 | 首次进入列表 | 头像从 gamekee CDN 取原图，压成 360px WebP（约 30KB），滚动即出 |
+| 3 | 映射就绪 | 冷启动立即进列表 | 3 秒 ready latch 后不再出现「首屏永久缺图」 |
+| 4 | 缓存 | `files/ba-assets` | 命中后秒开；文件无扩展名、内部存储、含 `.nomedia` |
+| 5 | 一键下载 · 头像与图标 | 更多 → 离线资源 → 下载 | 3366 张，约 4 分钟，实测 12.6 张/秒；完成 3363 张、失败 3、缓存 133.5MB |
+| 6 | 一键下载 · 全部（含立绘） | 点一次 | 按钮变「再点一次确认 500MB」，6 秒无操作自动恢复 |
+| 7 | 取消 / 续传 | 运行中点取消，再点开始 | 状态「已取消 · 已缓存 226 张 · 5.1MB」；再次开始跳过已缓存 |
+| 8 | 离线 | CDP 断网后重载 | 列表与已缓存图片正常显示，角标/收藏不受影响 |
+| 9 | 影画卡片 | 详情 → 影画 → 立绘 | 修复上游 flex 行布局导致标题竖排的问题（注入 `.mcard{flex-direction:column}`） |
+| 10 | 立绘透明通道 | 影画 → 立绘 | 合成深色渐变后 JPEG，无黑底；头像用 WebP 保留 alpha |
+| 11 | 返回键 | 详情/筛选/根 | 关详情、关面板、根退出，均正常 |
+| 12 | 触摸滚动 | 手指上/下滑 | 正常（含 `html{overflow:visible}` 修复） |
+| 13 | 深色模式 | `cmd uimode night yes/no` | 页面/状态栏/窗口背景同步，无重载 |
+| 14 | 同步/更新桥 | 更多页 | WIKI 同步「更新 5 名」；GitHub 更新检查经桥返回 |
+| 15 | 外链 | 资料页来源链接 | 系统浏览器打开，App 停留 |
+| 16 | 自更新 | `update.js` 选择逻辑 | 只挑 `android-v*` 且含 `.apk` 的 release，返回 apk 直链；`.apk` 外链走原生下载+安装 |
+| 17 | 图标 | 桌面 | 自适应图标（蓝底 + 角色前景），圆角遮罩完整 |
 
-> gamekee 接口在本机网络出口**时通时断**：曾成功同步并落盘 1.6MB overlay（角标生效），随后 TLS 握手失败。桥行为、落盘、失败降级与 UI 提示均已覆盖。
+| 列表（按需回源） | 离线资源入口 | 影画页 |
+| --- | --- | --- |
+| ![列表](screenshots/list.png) | ![离线资源](screenshots/offline-pack.png) | ![影画](screenshots/media.png) |
 
-## 4. 复核阶段对 Codex 交付的修正
+## 4. 1.0.2 关键改动
 
-| # | 文件 | 问题 | 修正 |
-| --- | --- | --- | --- |
-| 1 | `BaBridge.kt` | 单线程 `ExecutorService`：一次 25s 网络超时会把 store 读写全部堵住（实测 store 回复迟迟不到） | 改为 `newFixedThreadPool(4)` |
-| 2 | `BaBridge.kt` | UA 在自定义 headers **之后**设置，与 iOS（先 UA 后被 headers 覆盖）相反 | 调整顺序，与 `WebShell.swift` 一致 |
-| 3 | `InsetsController.kt` | 启动瞬间注入 `--safe-t/--safe-b` 时 `document.documentElement` 尚为 null，控制台 `Uncaught TypeError` | JS 内加 `if(!r) return` 守卫 |
-| 4 | `MainActivity.kt` | `target="_blank" rel="noreferrer"` 链接在 `setSupportMultipleWindows(false)` 下被 WebView 静默丢弃（资料页来源链接、更新弹窗「立即更新」都受影响） | 开启多窗口并实现 `WebChromeClient.onCreateWindow`：用一次性 WebView 捕获弹窗 URL → `ACTION_VIEW` 交系统浏览器 → 销毁 |
-| 5 | `AssetServer.kt` / `BridgeShim.kt` | **列表页手指划不动**：`web/styles.css` 的 `html, body { overflow-x: hidden }` 让 Chromium 把根元素当成内容高度的滚动容器（`overflow-y` 计算为 `auto`），视口无法触摸滚动——但 `window.scrollTo`/详情页内滚仍正常，所以极易漏测 | 注入 `html{overflow:visible!important}`（`BridgeShim.LAYOUT_CSS`），保留 body 的横向裁剪；实测上滑 `y 0→630`、下滑回顶、横向 `scrollWidth==clientWidth` |
+1. **素材外置**：`avatars/img/portraits` 不再打包，`asset-map.json`（3877 条，465KB）把本地路径映射回 gamekee 源 URL；`PathHandler` 先查缓存、再回源、最后回落 APK。
+2. **图像处理**：头像 360px WebP q80（保留 alpha）；立绘 480px，先合成 `#1A2230→#242E40` 竖直渐变再 JPEG q82（对齐原 `crawl/portraits.py`）；图标原样。
+3. **并发**：回源信号量 6 → 20；连续 5 次失败自动降到 8；批量下载 12 worker。
+4. **一键离线**：`basic`（头像+图标，3366 张）与 `all`（3877 张，含 511 张立绘）；空间检查 300MB、取消、跳过已缓存。
+5. **自更新**：`update.js` 指向本仓库，筛选 Android release 的 APK 资产；原生下载后用 `FileProvider` 拉起安装器。
+6. **上游同步**：合并 upstream 5 个提交（影画分页、语音改版、媒体缓存 `op:"cache"`），Android 侧实现 `cache` 的 set/get/size/clear（与 iOS 同 FNV-1a 命名）。
 
-| 6 | `res/mipmap-*`、`AndroidManifest.xml`、`values/colors.xml` | 应用图标仍为旧版四宫格 | 按用户提供的新图（256×256、蓝底圆形徽标）重新生成：自适应图标（背景色 + 前景 66%）+ 5 档旧版图标，`roundIcon` 同步 |
-## 5. 已知问题与限制
+## 5. 已知限制
 
-1. **更新弹窗指向 iOS Release 页**：`web/update.js` 用 `releases/latest` 的 `html_url`，Android 用户会被带到同时含 IPA 的发布页。发 Android 版时应在 Release 里附 APK，并把更新说明改成双端措辞（属 web 侧内容，不改代码路径）。
-2. **左缘 30px 右滑**：系统手势导航下该区域由系统接管；实测系统返回键已能关闭详情/浮层，UX 等价。`setSystemGestureExclusionRects` 受单边 200dp 上限，仅底部一段可能生效（已在代码中限高，未强依赖）。
-3. **`--safe-b` 在本模拟器为 0**：LDPlayer 不显示三键导航栏，属设备差异；三键导航真机需复验（代码按 `systemBars()` 计算，逻辑正确）。
-4. **同步依赖 gamekee（网络不稳定）**：已实测一次成功同步并落盘 1.6MB overlay、重启后角标生效；但随后同一网络下 `www.gamekee.com` 又不可达（`status=0`），「更多」页显示「检查失败」。属网络可达性问题，非实现缺陷；换稳定网络可复验。
-5. **debug 签名**：可安装测试，不适合上架或长期分发；release 构建目前未签名（`assembleRelease` 产物需自行签名）。
-6. **弹窗 WebView 边界**：`onCreateWindow` 的一次性 WebView 若遇到 `about:blank + document.write` 型弹窗，可能拿不到 URL（本 App 不产生此类弹窗）。
-7. 未做启动画面定制、横屏/平板适配（与 iOS 一致锁竖屏）。
-8. **iOS 图标未替换**：源图只有 256×256，iOS AppIcon 需要 1024×1024，直接放大发虚；拿到大图后可一并替换 `StudentDex/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png`。
+1. **首次浏览需联网**：冷缓存下首屏约 8–12 秒铺满（CDN 单张 200KB 级 + 20 并发），之后走缓存瞬开。
+2. **全量很重**：`all` 约 500MB 流量（立绘 511 张、单张 ~630KB），缓存约 165MB；建议 Wi-Fi。
+3. **依赖 gamekee CDN**：网络不可达时新图片 404（已缓存不受影响）；本机网络对 `www.gamekee.com` 时通时断。
+4. **一键下载需前台**：未做前台 Service，切后台可能被系统暂停；重进后再次点击会续传。
+5. **失败项**：实测 3366 张中 3 张失败（CDN 偶发），UI 显示「失败 3」，再次下载会重试。
+6. debug 包与 release 包签名不同，覆盖安装需先卸载；卸载会清空缓存。
+7. iOS 侧未改动（含图标），本项目只维护 Android port。
 
 ## 6. 后续建议
 
-- 增加 GitHub Actions：`gradle assembleRelease` + 签名密钥走 Secrets，Release 附 `StudentDex-<ver>.apk`。
-- 真机复验三键导航安全区、手势返回、深色模式切换。
-- 若要长期分发，配置 release keystore 并把 `versionCode` 与 iOS 版本号联动。
+- 首次启动预热前 1–2 屏头像（约 60 张 / 12MB），把首屏压到 2–3 秒。
+- 失败重试队列（自动重试 1 次）。
+- GitHub Actions：`assembleRelease` + Secrets 签名，Release 自动附 APK。
