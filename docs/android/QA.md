@@ -9,8 +9,8 @@
 
 | 项 | 值 |
 | --- | --- |
-| Release APK | `dist/StudentDex-1.0.2-android.apk`（14,219,699 字节） |
-| SHA-256 | `105cd8fdcf66e715b97668a476dbc147a6ba256689832d346f581be7dc4b5a5b` |
+| Release APK | `dist/StudentDex-1.0.2-android.apk`（14,220,107 字节） |
+| SHA-256 | `0ab8399e8016266b2074439aa38f36643fc225a259785e015e13c7e78f661e45` |
 | 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.2`、versionCode `2` |
 | SDK | minSdk 24，targetSdk 35，compileSdk 35 |
 | 签名 | release keystore（`CN=StudentDex, OU=Android, O=StudentDex`），APK Signature Scheme v2 |
