@@ -1,7 +1,7 @@
-# Android 端复核与验证报告（1.0.2）
+# Android 端复核与验证报告（1.0.3）
 
 - 验证环境：雷电模拟器 LDPlayer14，Android 14（API 34），系统 WebView 146，900×1600 @320dpi（dpr=2）
-- 结论：**1.0.2 可安装、可离线（缓存后）、支持应用内更新**；release 签名产物已发布。
+- 结论：**1.0.3 可安装、可离线（缓存后）、支持应用内更新**；release 签名产物已发布。
 
 ---
 
@@ -9,9 +9,9 @@
 
 | 项 | 值 |
 | --- | --- |
-| Release APK | `dist/StudentDex-1.0.2-android.apk`（14,220,107 字节） |
-| SHA-256 | `0ab8399e8016266b2074439aa38f36643fc225a259785e015e13c7e78f661e45` |
-| 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.2`、versionCode `2` |
+| Release APK | `dist/StudentDex-1.0.3-android.apk`（14,223,615 字节） |
+| SHA-256 | `6f23f96565e786c378a4f7ce85c1f8bdabc50817c5819003e61c4ef2f716b6aa` |
+| 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.3`、versionCode `3` |
 | SDK | minSdk 24，targetSdk 35，compileSdk 35 |
 | 签名 | release keystore（`CN=StudentDex, OU=Android, O=StudentDex`），APK Signature Scheme v2 |
 
@@ -50,6 +50,13 @@ D:/leidian/LDPlayer14/adb.exe install -r app/build/outputs/apk/release/app-relea
 | 列表（按需回源） | 离线资源入口 | 影画页 |
 | --- | --- | --- |
 | ![列表](screenshots/list.png) | ![离线资源](screenshots/offline-pack.png) | ![影画](screenshots/media.png) |
+
+## 3.1 1.0.3 同步的上游修复
+
+- 同步不再一次只处理 6 个（`MAX_NEW_PER_RUN` 6→200），实测一次点击「更新 5 名」跑完
+- 同步遇到系统「允许联网」弹窗时自动等待重试
+- 详情页姓名/学院在浅色立绘上加渐变遮罩与文字描边，可读性恢复
+- 视频下载中关闭浮层后作废在途请求，不再后台自动播放；同素材并发请求合并
 
 ## 4. 1.0.2 关键改动
 

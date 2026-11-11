@@ -3,7 +3,7 @@
   'use strict';
 
   const APP_NAME = '什亭之匣';
-  const APP_VERSION = 'V1.0.2';
+  const APP_VERSION = 'V1.0.3';
 
   // 内置数据（打包进 App），联网同步到的新学生会追加到这里
   const INDEX = (window.BA_INDEX || []).slice();

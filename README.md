@@ -36,7 +36,7 @@ Android 版与 iOS 共用同一套数据与页面，外壳采用 WebView；APK �
 
 | 项目 | 说明 |
 | --- | --- |
-| 下载 | 前往 [Releases](../../releases) 下载 `StudentDex-1.0.2-android.apk`（release 签名，直接安装） |
+| 下载 | 前往 [Releases](../../releases) 下载 `StudentDex-1.0.3-android.apk`（release 签名，直接安装） |
 | 系统要求 | Android 7.0（API 24）及以上；系统 WebView ≥ 111 |
 | 联网说明 | 首次浏览图片需联网；头像网格建议 Wi-Fi，源头像单张约 200 KB 级；已缓存图片可离线查看 |
 | 源码 | [`android/`](android/)，Kotlin 单 Activity + `WebViewAssetLoader`，核心页面在 APK，图片按需回源 |

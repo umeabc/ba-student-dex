@@ -18,8 +18,8 @@ android {
         applicationId = "com.sensei.studentdex"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.2"
+        versionCode = 3
+        versionName = "1.0.3"
     }
     sourceSets["main"].assets.srcDir("../../web")
     sourceSets["main"].assets.exclude("_test*.html", "avatars/**", "img/**", "portraits/**")
