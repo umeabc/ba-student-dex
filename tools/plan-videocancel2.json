@@ -1,0 +1,17 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.__plays=0;const _p=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__plays++;return _p.apply(this,arguments)};",
+  "shots": [
+    { "name": "VC1-open", "wait": 2500, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"148495\"]').click();document.querySelector('[data-act=dt][data-t=media]').click();var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('视频')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "VC2-start", "after": 700, "wait": 100,
+      "js": "(function(){window.__plays=0;document.querySelector('.mcard.vid').click();return 'started'})()" },
+    { "name": "VC3-close", "after": 1200, "wait": 100,
+      "js": "(function(){var b=document.querySelector('.mv-close');if(!b)return{noBtn:true};b.click();return 'closed-click'})()" },
+    { "name": "VC4-verify-closed", "after": 600, "wait": 100,
+      "js": "(function(){return {viewer:!!document.getElementById('media-viewer'),plays:window.__plays}})()" },
+    { "name": "VC5-wait-load", "after": 8000, "wait": 200,
+      "js": "(function(){return {playsAfterClose:window.__plays,videos:document.querySelectorAll('video').length,errs:window.__errs}})()" }
+  ]
+}

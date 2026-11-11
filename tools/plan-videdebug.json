@@ -1,0 +1,15 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__plays=0;window.__errs=[];const _p=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__plays++;return _p.apply(this,arguments)};",
+  "shots": [
+    { "name": "VE1", "wait": 2500, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"148495\"]').click();document.querySelector('[data-act=dt][data-t=media]').click();var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('视频')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "VE2-play", "after": 700, "wait": 100,
+      "js": "(function(){document.querySelector('.mcard.vid').click();return 'ok'})()" },
+    { "name": "VE3-mid", "after": 3000, "wait": 100,
+      "js": "(function(){var v=document.getElementById('mv-video');var ph=document.querySelector('.mv-loading');return {loadingText:ph?ph.textContent:null,hasSrc:v?!!v.src:false,plays:window.__plays}})()" },
+    { "name": "VE4-late", "after": 9000, "wait": 300,
+      "js": "(function(){var v=document.getElementById('mv-video');var ph=document.querySelector('.mv-loading');return {loadingText:ph?ph.textContent:null,hasSrc:v?v.src.slice(0,10):null,readyState:v?v.readyState:null,plays:window.__plays,errs:window.__errs}})()" }
+  ]
+}

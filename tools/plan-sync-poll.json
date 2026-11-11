@@ -1,0 +1,11 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.__t0=Date.now();window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "SZ1-poll", "wait": 3000, "after": 200,
+      "js": "new Promise(function(res){var iv=setInterval(function(){var st=window.BASync.state;if(st.lastResult&&!st.running){clearInterval(iv);res({result:st.lastResult,seconds:Math.round((Date.now()-window.__t0)/1000)});}else if(Date.now()-window.__t0>420000){clearInterval(iv);res({timeout:true,running:st.running});}},1000);})" },
+    { "name": "SZ2-after", "after": 1500, "wait": 300,
+      "js": "(function(){return {toast:(document.querySelector('.toast')||{}).textContent,cards:document.querySelectorAll('.card').length,updatedBadges:document.querySelectorAll('.newbadge').length,errs:window.__errs}})()" }
+  ]
+}

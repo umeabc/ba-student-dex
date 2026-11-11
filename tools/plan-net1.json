@@ -1,0 +1,10 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "NW1-waiting", "wait": 4200, "after": 100,
+      "js": "(function(){return {waiting:window.BASync.state.waitingNetwork,running:window.BASync.state.running,toast:(document.querySelector('.toast')||{}).textContent,errs:window.__errs}})()" },
+    { "name": "NW2-shot", "after": 200, "wait": 50, "js": "'x'" }
+  ]
+}

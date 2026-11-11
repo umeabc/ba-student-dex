@@ -47,6 +47,18 @@ const server = http.createServer(async (req, res) => {
   try {
     const msg = JSON.parse(body || '{}');
 
+    // 测试用：模拟断网（所有 gamekee 请求返回 status 0）
+    if (fakeOff && (msg.url || '').indexOf('gamekee') >= 0) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 0, b64: '' }));
+      console.log('[rpc] FAKE OFFLINE', msg.url.slice(0, 60));
+      return;
+    }
+
+    // 测试用：视频请求人为延迟，方便验证「下载中退出」的行为
+    const SLOW_VIDEO = /\.mp4$/i.test(msg.url || '');
+    if (SLOW_VIDEO) await new Promise((r) => setTimeout(r, 4000));
+
     if (msg.url && msg.url.indexOf('api.github.com') >= 0) {
       if (fakeOff) throw new Error('fake network off');
       const payload = JSON.stringify(fakeRelease(fakeTag));

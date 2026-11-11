@@ -1,0 +1,19 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.__plays=0;const _p=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__plays++;return _p.apply(this,arguments)};window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "VB1-open", "wait": 2500, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"148495\"]').click();document.querySelector('[data-act=dt][data-t=media]').click();var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('视频')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "VB2-start", "after": 900, "wait": 100,
+      "js": "(function(){var b=document.querySelector('.mcard.vid');b.click();window.__plays=0;return 'clicked'})()" },
+    { "name": "VB3-close-early", "after": 900, "wait": 100,
+      "js": "(function(){document.getElementById('media-viewer')?document.querySelector('.mv-close').click():0;return {closed:!document.getElementById('media-viewer'),playsSoFar:window.__plays}})()" },
+    { "name": "VB4-after-load", "after": 9000, "wait": 200,
+      "js": "(function(){return {playsAfterClose:window.__plays,viewer:!!document.getElementById('media-viewer'),mediaEls:document.querySelectorAll('video').length,errs:window.__errs}})()" },
+    { "name": "VB5-reopen", "after": 600, "wait": 100,
+      "js": "(function(){document.querySelector('.mcard.vid').click();return 'reopened'})()" },
+    { "name": "VB6-played", "after": 4000, "wait": 200,
+      "js": "(function(){var v=document.getElementById('mv-video');return {plays:window.__plays,readyState:v?v.readyState:null,errs:window.__errs}})()" }
+  ]
+}

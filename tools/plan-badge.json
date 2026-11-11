@@ -1,0 +1,11 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];",
+  "shots": [
+    { "name": "BD1-wait", "wait": 3000, "after": 200,
+      "js": "new Promise(function(res){var t0=Date.now();var iv=setInterval(function(){var st=window.BASync.state;if(st.lastResult&&!st.running){clearInterval(iv);res(st.lastResult);}else if(Date.now()-t0>300000){clearInterval(iv);res({timeout:true});}},1000);})" },
+    { "name": "BD2-probe", "after": 1200, "wait": 200,
+      "js": "(function(){var ov=null;try{ov=JSON.parse(localStorage.getItem('ba_test_store')||'{}')}catch(e){}var keys=Object.keys((ov&&ov.students)||{});var sample=keys.slice(0,3).map(function(k){var s=ov.students[k];return {id:k,isUpdated:!!s.isUpdated,at:s.updatedSyncedAt}});var cards=Array.from(document.querySelectorAll('.card')).slice(0,3).map(function(c){var b=c.querySelector('.newbadge');return {id:c.dataset.id,badge:b?b.textContent:null}});return {overlayStudents:keys.length,isUpdatedFlags:sample.map(function(x){return x.isUpdated}),cards:cards,indexHasUpdated:(ov.index||[]).filter(function(x){return x.isUpdated}).length,errs:window.__errs}})()" }
+  ]
+}

@@ -1,0 +1,13 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.__log=[];",
+  "shots": [
+    { "name": "NZ1", "wait": 2500, "after": 100,
+      "js": "(function(){window.__t0=Date.now();fetch('http://127.0.0.1:8899/mode?off=0');return {waiting:window.BASync.state.waitingNetwork}})()" },
+    { "name": "NZ2-poll", "after": 5000, "wait": 100,
+      "js": "new Promise(function(res){var iv=setInterval(function(){var st=window.BASync.state;var el=Math.round((Date.now()-window.__t0)/1000);if(st.lastResult&&!st.running){clearInterval(iv);res({done:st.lastResult,seconds:el});}else if(el>150){clearInterval(iv);res({timeout:true,running:st.running,waiting:st.waitingNetwork,last:st.lastResult});}},3000);})" },
+    { "name": "NZ3-toast", "after": 800, "wait": 200,
+      "js": "(function(){return {toast:(document.querySelector('.toast')||{}).textContent,errs:window.__errs}})()" }
+  ]
+}

@@ -1,0 +1,11 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];",
+  "shots": [
+    { "name": "HS1-open", "wait": 3600, "after": 400,
+      "js": "(function(){var m=document.getElementById('update-modal');if(m){var b=document.querySelector('[data-act=modal-close]');if(b)b.click();}setTimeout(function(){var c=document.querySelector('[data-act=open][data-id=\"189672\"]');if(c)c.click();},500);return 'ok'})()" },
+    { "name": "HS2-shot", "after": 1600, "wait": 200, "js": "'x'" },
+    { "name": "HS3-dark", "media": "dark", "after": 500, "wait": 200, "js": "'x'" }
+  ]
+}

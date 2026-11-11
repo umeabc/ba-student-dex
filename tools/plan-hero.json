@@ -1,0 +1,12 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];",
+  "shots": [
+    { "name": "HR1-light", "wait": 2600, "after": 500,
+      "js": "(function(){var c=document.querySelector('[data-act=open][data-id=\"189672\"]');c.click();return 'ok'})()" },
+    { "name": "HR2-light-shot", "after": 900, "wait": 100, "js": "'x'" },
+    { "name": "HR3-dark", "media": "dark", "after": 700, "wait": 100, "js": "'x'" },
+    { "name": "HR4-dark-shot", "media": "dark", "after": 400, "wait": 100, "js": "'x'" }
+  ]
+}

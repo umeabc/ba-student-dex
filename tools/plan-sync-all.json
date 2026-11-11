@@ -1,0 +1,11 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "SY1-boot", "wait": 3000, "after": 300,
+      "js": "(function(){var m=document.getElementById('update-modal');if(m)document.querySelector('[data-act=modal-close]').click();return {cards:document.querySelectorAll('.card').length,last:window.BASync.state.lastResult}})()" },
+    { "name": "SY2-after-check", "after": 90000, "wait": 500,
+      "js": "(function(){return {last:window.BASync.state.lastResult,toast:(document.querySelector('.toast')||{}).textContent,cards:document.querySelectorAll('.card').length,errs:window.__errs}})()" }
+  ]
+}

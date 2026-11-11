@@ -1,0 +1,13 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.__toasts=[];const _t=window.setTimeout;window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});(function loop(){setInterval(function(){var el=document.querySelector('.toast');if(el&&window.__toasts.indexOf(el.textContent)<0)window.__toasts.push(el.textContent)},400)})();",
+  "shots": [
+    { "name": "NX1-early", "wait": 1900, "after": 50,
+      "js": "(function(){return {waiting:window.BASync.state.waitingNetwork,toasts:window.__toasts.slice(),toastNow:(document.querySelector('.toast')||{}).textContent}})()" },
+    { "name": "NX2-recover", "after": 1500, "wait": 100,
+      "js": "(function(){return fetch('http://127.0.0.1:8899/mode?off=0').then(function(r){return r.text()}).then(function(t){return {mode:t}})})()" },
+    { "name": "NX3-done", "after": 20000, "wait": 300,
+      "js": "(function(){return {last:window.BASync.state.lastResult,waiting:window.BASync.state.waitingNetwork,toasts:window.__toasts.slice(-3),errs:window.__errs}})()" }
+  ]
+}

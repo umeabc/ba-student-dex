@@ -1,0 +1,13 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__plays=0;window.__errs=[];const _p=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__plays++;return _p.apply(this,arguments)};",
+  "shots": [
+    { "name": "VD1", "wait": 2500, "after": 400,
+      "js": "(function(){document.querySelector('[data-act=open][data-id=\"148495\"]').click();document.querySelector('[data-act=dt][data-t=media]').click();var c=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(x){return x.textContent.indexOf('视频')>=0})[0];c.click();return 'ok'})()" },
+    { "name": "VD2-play", "after": 700, "wait": 100,
+      "js": "(function(){window.__plays=0;document.querySelector('.mcard.vid').click();return 'ok'})()" },
+    { "name": "VD3-result", "after": 7000, "wait": 300,
+      "js": "(function(){var v=document.getElementById('mv-video');return {plays:window.__plays,readyState:v?v.readyState:null,duration:v?Math.round(v.duration||0):null,errs:window.__errs}})()" }
+  ]
+}
