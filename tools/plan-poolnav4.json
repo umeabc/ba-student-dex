@@ -1,0 +1,21 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 2, "outDir": "shots/reg",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push(e.message)});",
+  "shots": [
+    { "name": "T01", "wait": 4000, "after": 300,
+      "js": "(function(){document.querySelector('[data-tab=overview]').click();return 'ok'})()" },
+    { "name": "T02-pool", "after": 6000, "wait": 200,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=ov-mode]')).filter(function(x){return x.dataset.m==='pool'})[0];b.click();return 'ok'})()" },
+    { "name": "T03-fes", "after": 6000, "wait": 200,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=pool-tag]')).filter(function(x){return x.textContent==='FES'})[0];if(!b)return{noTag:true};b.click();return 'ok'})()" },
+    { "name": "T04-expand", "after": 1200, "wait": 200,
+      "js": "(function(){var b=document.querySelector('[data-act=pool-more]');if(b)b.click();return 'ok'})()" },
+    { "name": "T05-find-star", "after": 1200, "wait": 200,
+      "js": "(function(){var cards=Array.from(document.querySelectorAll('.actcard[data-act=pool-student]'));var names=cards.map(function(c){return c.dataset.name});var s=cards.filter(function(c){return c.dataset.name.indexOf('星野')>=0&&c.dataset.name.indexOf('临战')>=0})[0];if(!s)return{notFound:true,names:names};s.click();return new Promise(function(r){setTimeout(function(){r({picker:!!document.getElementById('pick-modal'),items:Array.from(document.querySelectorAll('[data-act=pick-item]')).map(function(x){return x.textContent.replace('›','').trim()})})},1200)})})()" },
+    { "name": "T06-pick", "after": 500, "wait": 100,
+      "js": "(function(){var b=document.querySelector('[data-act=pick-item]');if(!b)return{noItem:true};b.click();return new Promise(function(r){setTimeout(function(){r({detailName:(document.querySelector('.hero-info h2')||{}).textContent,pickerGone:!document.getElementById('pick-modal')})},1500)})})()" },
+    { "name": "T07-errs", "after": 400, "wait": 100,
+      "js": "(function(){return {errs:window.__errs}})()" }
+  ]
+}

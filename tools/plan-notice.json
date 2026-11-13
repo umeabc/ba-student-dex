@@ -1,0 +1,17 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "NT1-list", "wait": 2600, "after": 400,
+      "js": "(function(){var m=document.getElementById('update-modal');if(m){var b=document.querySelector('[data-act=modal-close]');if(b)b.click();}var t=document.querySelector('[data-tab=notice]');if(!t)return{noTab:true};t.click();return {tabs:Array.from(document.querySelectorAll('.tabbar button')).map(function(b){return b.textContent})}})()" },
+    { "name": "NT2-loaded", "after": 6000, "wait": 300,
+      "js": "(function(){var cards=document.querySelectorAll('.ntcard');return {cards:cards.length,first:cards[0]?cards[0].querySelector('.t').textContent:null,date:cards[0]?cards[0].querySelector('.m').textContent:null,imgs:document.querySelectorAll('.ntcard .thumb img').length,loaded:Array.from(document.querySelectorAll('.ntcard .thumb img')).filter(function(i){return i.src.indexOf('blob:')===0}).length,errs:window.__errs}})()" },
+    { "name": "NT3-shot", "after": 400, "wait": 100, "js": "'x'" },
+    { "name": "NT4-detail", "after": 600, "wait": 100,
+      "js": "(function(){var c=document.querySelector('.ntcard');if(!c)return{noCard:true};c.click();return 'opened'})()" },
+    { "name": "NT5-detail-loaded", "after": 7000, "wait": 300,
+      "js": "(function(){var root=document.getElementById('nt-view');if(!root)return{noOverlay:true};var body=root.querySelector('.nt-body');return {title:(root.querySelector('.nt-title h2')||{}).textContent,date:(root.querySelector('.nt-title span')||{}).textContent,blocks:{p:body.querySelectorAll('.nt-p').length,img:body.querySelectorAll('.nt-img').length,table:body.querySelectorAll('.nt-table').length,h:body.querySelectorAll('h2,h3,h4').length},textLen:body.textContent.trim().length,errs:window.__errs}})()" },
+    { "name": "NT6-detail-shot", "after": 500, "wait": 100, "js": "'x'" }
+  ]
+}

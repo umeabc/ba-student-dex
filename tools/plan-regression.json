@@ -1,0 +1,84 @@
+{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390,
+  "height": 844,
+  "dpr": 2,
+  "outDir": "shots/reg",
+  "preScript": "window.__errs=[];window.__ext=[];window.addEventListener('error',function(e){window.__errs.push(e.message)});window.addEventListener('unhandledrejection',function(e){window.__errs.push('reject:'+(e.reason&&e.reason.message||e.reason))});const _open=window.open;window.open=function(u){window.__ext.push(String(u));return null};document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[target=_blank]');if(a){window.__ext.push(a.href);e.preventDefault()}},true);",
+  "shots": [
+    { "name": "R01-list", "wait": 4200, "after": 500,
+      "js": "(function(){var c=document.querySelectorAll('.card');var imgs=Array.from(document.querySelectorAll('.card img'));return {cards:c.length,avatars:imgs.filter(function(i){return i.src.indexOf('avatars/')>=0}).length,title:(document.querySelector('.topbar-title h1')||{}).textContent,count:(document.querySelector('.topbar-title .count')||{}).textContent,tabs:Array.from(document.querySelectorAll('.tabbar button')).map(function(b){return b.textContent}),errs:window.__errs.slice()}})()" },
+
+    { "name": "R02-search", "after": 500, "wait": 100,
+      "js": "(function(){var q=document.getElementById('q');q.value='拉娜';q.dispatchEvent(new Event('input',{bubbles:true}));return new Promise(function(r){setTimeout(function(){var c=document.querySelectorAll('.card');r({cards:c.length,first:c[0]?c[0].querySelector('.nm').textContent:null})},700)})})()" },
+
+    { "name": "R03-search-clear", "after": 400, "wait": 100,
+      "js": "(function(){var b=document.querySelector('[data-act=clear-q]');if(b)b.click();return new Promise(function(r){setTimeout(function(){r({cards:document.querySelectorAll('.card').length})},500)})})()" },
+
+    { "name": "R04-filter", "after": 400, "wait": 100,
+      "js": "(function(){document.querySelector('[data-act=filter-open]').click();return new Promise(function(r){setTimeout(function(){var c=document.querySelector('.fchip[data-k=rarity][data-v=\"3\"]');if(c)c.click();var btn=document.querySelector('.sheet-foot .btn.primary');var label=btn?btn.textContent:null;setTimeout(function(){btn.click();setTimeout(function(){r({count:document.querySelector('.topbar-title .count').textContent,label:label})},600)},300)},400)})})()" },
+
+    { "name": "R05-filter-reset", "after": 500, "wait": 100,
+      "js": "(function(){var all=Array.from(document.querySelectorAll('.chiprow .chip')).filter(function(c){return c.textContent.indexOf('全部')>=0})[0];all.click();return new Promise(function(r){setTimeout(function(){r({count:document.querySelector('.topbar-title .count').textContent})},500)})})()" },
+
+    { "name": "R06-sort", "after": 400, "wait": 100,
+      "js": "(function(){var b=document.querySelector('[data-act=sort-cycle]');var before=b.textContent.trim();b.click();return new Promise(function(r){setTimeout(function(){var b2=document.querySelector('[data-act=sort-cycle]');r({before:before,after:b2.textContent.trim(),first:document.querySelector('.card .nm').textContent})},600)})})()" },
+
+    { "name": "R07-open-detail", "after": 500, "wait": 100,
+      "js": "(function(){var c=Array.from(document.querySelectorAll('.card')).filter(function(x){return x.dataset.id==='148495'})[0];if(!c)return{noCard:true};c.click();return new Promise(function(r){setTimeout(function(){r({name:(document.querySelector('.hero-info h2')||{}).textContent,tabs:document.querySelectorAll('.seg button').length,bodyLen:(document.querySelector('.detail-body')||{textContent:''}).textContent.trim().length})},900)})})()" },
+
+    { "name": "R08-tabs", "after": 600, "wait": 100,
+      "js": "(function(){var names=['skills','stats','grow','profile','voice','media'];var out={};var i=0;function next(){if(i>=names.length){return Promise.resolve(out)}var t=names[i++];var b=document.querySelector('[data-act=dt][data-t=\"'+t+'\"]');if(b)b.click();return new Promise(function(r){setTimeout(function(){var body=document.querySelector('.detail-body');out[t]=body?body.textContent.trim().length:0;r(next())},700)})}return next()})()" },
+
+    { "name": "R09-voice", "after": 600, "wait": 100,
+      "js": "(function(){document.querySelector('[data-act=dt][data-t=voice]').click();return new Promise(function(r){setTimeout(function(){r({items:document.querySelectorAll('.voice-item').length,plays:document.querySelectorAll('.vplay').length,cv:(document.querySelector('.cv-line')||{}).textContent?'yes':'no',toggle:document.querySelectorAll('.vchip').length,note:(document.querySelector('.netnote')||{}).textContent?'yes':'no'})},2500)})})()" },
+
+    { "name": "R10-media", "after": 600, "wait": 100,
+      "js": "(function(){document.querySelector('[data-act=dt][data-t=media]').click();return new Promise(function(r){setTimeout(function(){r({chips:Array.from(document.querySelectorAll('.voice-cat .chip')).map(function(c){return c.textContent}),imgs:document.querySelectorAll('.mgallery img').length})},2500)})})()" },
+
+    { "name": "R11-viewer-open", "after": 500, "wait": 100,
+      "js": "(function(){var cards=Array.from(document.querySelectorAll('.voice-cat .chip')).filter(function(c){return c.textContent.indexOf('官方介绍')>=0})[0];if(cards)cards.click();return new Promise(function(r){setTimeout(function(){var f=document.querySelector('.mcard[data-act=mview]');if(!f)return r({noCard:true});f.click();setTimeout(function(){r({open:!!document.getElementById('media-viewer')})},1200)},1500)})})()" },
+
+    { "name": "R12-viewer-close", "after": 700, "wait": 100,
+      "js": "(function(){var b=document.querySelector('.mv-close');if(!b)return{noBtn:true};b.click();return new Promise(function(r){setTimeout(function(){r({closed:!document.getElementById('media-viewer')})},500)})})()" },
+
+    { "name": "R13-back", "after": 500, "wait": 100,
+      "js": "(function(){var b=document.querySelector('[data-act=back]');if(b)b.click();return new Promise(function(r){setTimeout(function(){r({list:document.querySelectorAll('.card').length,detailOpen:document.getElementById('detail').classList.contains('in')})},700)})})()" },
+
+    { "name": "R14-overview", "after": 500, "wait": 100,
+      "js": "(function(){document.querySelector('[data-tab=overview]').click();return new Promise(function(r){setTimeout(function(){var cards=document.querySelectorAll('.actcard');r({cards:cards.length,sections:Array.from(document.querySelectorAll('.section-title')).map(function(x){return x.textContent}),count:(document.querySelector('.topbar-title .count')||{}).textContent})},6000)})})()" },
+
+    { "name": "R15-server-cn", "after": 500, "wait": 100,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=act-server]')).filter(function(x){return x.textContent.indexOf('国服')>=0})[0];b.click();return new Promise(function(r){setTimeout(function(){var c=document.querySelectorAll('.actcard');r({cards:c.length,first:c[0]?c[0].querySelector('.t').textContent:null})},6000)})})()" },
+
+    { "name": "R16-pool", "after": 500, "wait": 100,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=ov-mode]')).filter(function(x){return x.dataset.m==='pool'})[0];if(!b)return{noBtn:true};b.click();return new Promise(function(r){setTimeout(function(){var c=document.querySelectorAll('.actcard');r({cards:c.length,sections:Array.from(document.querySelectorAll('.section-title')).map(function(x){return x.textContent}),imgs:Array.from(document.querySelectorAll('.actcard .thumb img')).filter(function(i){return i.src.indexOf('blob:')===0}).length})},6000)})})()" },
+
+    { "name": "R17-pool-tag", "after": 500, "wait": 100,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=pool-tag]')).filter(function(x){return x.textContent==='限定'})[0];if(!b)return{noBtn:true};b.click();return new Promise(function(r){setTimeout(function(){r({cards:document.querySelectorAll('.actcard').length})},900)})})()" },
+
+    { "name": "R18-act-inapp", "after": 500, "wait": 100,
+      "js": "(function(){var t=Array.from(document.querySelectorAll('[data-act=ov-mode]')).filter(function(x){return x.dataset.m==='activity'})[0];t.click();return new Promise(function(r){setTimeout(function(){var c=document.querySelector('.actcard[data-act=doc-open]');if(!c)return r({noCard:true});window.__ext=[];c.click();setTimeout(function(){var root=document.getElementById('nt-view');r({overlay:!!root,title:root?(root.querySelector('.nt-title h2')||{}).textContent:null,external:window.__ext.length,blocks:root?root.querySelectorAll('.nt-p').length:0})},5000)},1200)})})()" },
+
+    { "name": "R19-doc-close", "after": 500, "wait": 100,
+      "js": "(function(){var b=document.querySelector('[data-act=nt-close]');if(!b)return{noBtn:true};b.click();return new Promise(function(r){setTimeout(function(){r({closed:!document.getElementById('nt-view')})},600)})})()" },
+
+    { "name": "R20-notice", "after": 500, "wait": 100,
+      "js": "(function(){document.querySelector('[data-tab=notice]').click();return new Promise(function(r){setTimeout(function(){r({cards:document.querySelectorAll('.ntcard').length,first:document.querySelector('.ntcard .t')?document.querySelector('.ntcard .t').textContent:null})},5000)})})()" },
+
+    { "name": "R21-notice-detail", "after": 500, "wait": 100,
+      "js": "(function(){var c=document.querySelector('.ntcard');window.__ext=[];c.click();return new Promise(function(r){setTimeout(function(){var root=document.getElementById('nt-view');var head=root?root.querySelector('.nt-head'):null;r({overlay:!!root,title:root?(root.querySelector('.nt-title h2')||{}).textContent:null,padTop:head?getComputedStyle(head).paddingTop:null,blocks:root?root.querySelectorAll('.nt-p').length:0,external:window.__ext.length})},6000)})})()" },
+
+    { "name": "R22-notice-close", "after": 500, "wait": 100,
+      "js": "(function(){var b=document.querySelector('[data-act=nt-close]');b.click();return new Promise(function(r){setTimeout(function(){r({closed:!document.getElementById('nt-view')})},600)})})()" },
+
+    { "name": "R23-more", "after": 500, "wait": 100,
+      "js": "(function(){document.querySelector('[data-tab=more]').click();return new Promise(function(r){setTimeout(function(){var rows=Array.from(document.querySelectorAll('.rowlink')).map(function(x){return x.textContent.replace(/\\s+/g,' ').trim()});r({rows:rows.slice(0,6),version:document.getElementById('app-version')?document.getElementById('app-version').textContent:null,cache:document.getElementById('cache-size')?document.getElementById('cache-size').textContent:null})},900)})})()" },
+
+    { "name": "R24-fav", "after": 500, "wait": 100,
+      "js": "(function(){document.querySelector('[data-tab=students]').click();return new Promise(function(r){setTimeout(function(){var c=Array.from(document.querySelectorAll('.card')).filter(function(x){return x.dataset.id==='148495'})[0];c.click();setTimeout(function(){var f=document.querySelector('[data-act=fav]');if(f)f.click();setTimeout(function(){document.querySelector('[data-act=back]').click();setTimeout(function(){document.querySelector('[data-tab=favorites]').click();setTimeout(function(){r({favCards:document.querySelectorAll('.card').length})},700)},700)},400)},900)},500)})})()" },
+
+    { "name": "R25-final", "after": 800, "wait": 200,
+      "js": "(function(){return {errs:window.__errs.slice(),external:window.__ext.length}})()" }
+  ]
+}

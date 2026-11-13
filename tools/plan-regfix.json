@@ -1,0 +1,23 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 2, "outDir": "shots/reg",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push(e.message)});",
+  "shots": [
+    { "name": "F01", "wait": 4000, "after": 300,
+      "js": "(function(){document.querySelector('[data-tab=overview]').click();return 'ok'})()" },
+    { "name": "F02-cn-pool", "after": 6000, "wait": 200,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=act-server]')).filter(function(x){return x.textContent.indexOf('国服')>=0})[0];b.click();return 'ok'})()" },
+    { "name": "F03-pool-mode", "after": 5000, "wait": 200,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=ov-mode]')).filter(function(x){return x.dataset.m==='pool'})[0];b.click();return 'ok'})()" },
+    { "name": "F04-tag", "after": 6000, "wait": 200,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=pool-tag]')).filter(function(x){return x.textContent==='限定'})[0];b.click();return 'ok'})()" },
+    { "name": "F05-result", "after": 1200, "wait": 200,
+      "js": "(function(){return {cards:document.querySelectorAll('.actcard').length,sections:Array.from(document.querySelectorAll('.section-title')).map(function(x){return x.textContent}),more:!!document.querySelector('[data-act=pool-more]'),errs:window.__errs}})()" },
+    { "name": "F06-act-kind", "after": 400, "wait": 100,
+      "js": "(function(){var a=Array.from(document.querySelectorAll('[data-act=ov-mode]')).filter(function(x){return x.dataset.m==='activity'})[0];a.click();return 'ok'})()" },
+    { "name": "F07-kind-filter", "after": 1200, "wait": 200,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=act-kind]')).filter(function(x){return x.textContent==='总力大决'})[0];if(!b)return{noBtn:true};b.click();return 'ok'})()" },
+    { "name": "F08-result", "after": 1200, "wait": 200,
+      "js": "(function(){return {cards:document.querySelectorAll('.actcard').length,sections:Array.from(document.querySelectorAll('.section-title')).map(function(x){return x.textContent}),errs:window.__errs}})()" }
+  ]
+}

@@ -50,7 +50,8 @@
     voiceAudio: undefined,    // undefined=未请求; null=加载中; {}=无音频
     voiceAudioFor: null,      // 当前 audio 属于哪个学生
     voiceAudioLoading: {},    // id -> 1（避免重复请求）
-    mediaCat: null,           // 影画鉴赏当前分类
+    mediaCat: null,
+    overviewMode: 'activity',   // 总览：活动 / 卡池           // 影画鉴赏当前分类
     netToast: 0,
     sheetOpen: false,
     draft: null,
@@ -153,6 +154,8 @@
   }
 
   const ICON = {
+    notice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h9l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V5A1.5 1.5 0 0 1 6.5 3.5z"/><path d="M15 3.5V8h4.5"/><path d="M8.5 12h7M8.5 15.5h7M8.5 8.5h3"/></svg>',
+    overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="3"/><path d="M8 3v3M16 3v3M3.5 9.5h17"/><path d="M7.5 13h3M7.5 16.5h3M13.5 13h3M13.5 16.5h3"/></svg>',
     students: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>',
     school: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 11v9h14v-9"/><path d="M9.5 20v-5h5v5"/></svg>',
     heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20s-7.5-4.7-7.5-9.6A4.4 4.4 0 0 1 12 7.4a4.4 4.4 0 0 1 7.5 3c0 4.9-7.5 9.6-7.5 9.6Z"/></svg>',
@@ -175,6 +178,7 @@
   let FACETS = null;
 
   function buildFacets() {
+    NAME_IDX = null;   // 学生集合变了，重建名字索引
     FACETS = {
       rarity: { label: '稀有度', values: [3, 2, 1], fmt: function (v) { return v + '★'; } },
       school: { label: '学院', values: uniq(INDEX.map(function (s) { return s.school; })) },
@@ -270,6 +274,692 @@
 
   function sortLabel() {
     return { date: '日期', name: '名称', rarity: '稀有' }[state.sort];
+  }
+
+  /* ------------------------------------------------------------ 总览（活动） */
+  const ACTIVITY_API = 'https://www.gamekee.com/v1/activity/page-list';
+  const SERVERS = [
+    { id: 15, name: '日服' },
+    { id: 16, name: '国服' },
+    { id: 17, name: '国际服' }
+  ];
+  const KINDS = [
+    [0, '全部'], [14, '活动'], [15, '总力大决'], [16, '多倍活动'],
+    [17, '爬塔'], [19, '战术测试'], [18, '指引任务'], [31, '其他']
+  ];
+  const ACT_CACHE_MS = 10 * 60 * 1000;
+
+  const POOL_API = 'https://www.gamekee.com/v1/cardPool/query-list';
+  const POOL_TAGS = { 6: '限定', 7: 'FES', 8: '联动', 9: '复刻', 92: '回忆', 112: '安可' };
+
+  const POOL = {
+    data: {},
+    loading: {},
+    failed: {},
+    tag: 0,
+    showEnded: false,
+    allHistory: false
+  };
+
+  const ACT = {
+    server: 15,
+    kind: 0,
+    data: {},        // serverId -> { list, at }
+    loading: {},
+    failed: {},
+    showEnded: false
+  };
+
+  function actCacheKey(id) { return 'ba.act.' + id; }
+
+  function loadActivities(force) {
+    const id = ACT.server;
+    const hit = ACT.data[id];
+    if (!force && hit && (Date.now() - hit.at) < ACT_CACHE_MS) return Promise.resolve(hit.list);
+    if (ACT.loading[id]) return ACT.loading[id];
+    if (!window.BAFetch || !window.BAFetch.available()) {
+      // 浏览器预览时直接用 fetch（gamekee 允许跨域）
+      ACT.loading[id] = fetch(ACTIVITY_URL(id)).then(function (r) { return r.json(); }).then(function (j) {
+        delete ACT.loading[id];
+        return acceptActivities(id, j);
+      }).catch(function () { delete ACT.loading[id]; ACT.failed[id] = 1; return null; });
+      return ACT.loading[id];
+    }
+    ACT.loading[id] = window.BAFetch.json(ACTIVITY_URL(id), { 'game-alias': 'ba' }).then(function (j) {
+      delete ACT.loading[id];
+      return acceptActivities(id, j);
+    }).catch(function () {
+      delete ACT.loading[id];
+      ACT.failed[id] = 1;
+      return null;
+    });
+    return ACT.loading[id];
+  }
+
+  function ACTIVITY_URL(id) {
+    return ACTIVITY_API + '?importance=0&sort=-1&keyword=&limit=999&page_no=1&serverId=' + id + '&status=0';
+  }
+
+  function acceptActivities(id, j) {
+    const list = (j && j.data) || [];
+    ACT.data[id] = { list: list, at: Date.now() };
+    try {
+      localStorage.setItem(actCacheKey(id), JSON.stringify({ list: list, at: Date.now() }));
+    } catch (e) { /* 忽略配额 */ }
+    ACT.failed[id] = 0;
+    return list;
+  }
+
+  // 冷启动先读本地缓存，避免进页面空白
+  function warmActivities() {
+    SERVERS.forEach(function (sv) {
+      if (ACT.data[sv.id]) return;
+      try {
+        const raw = localStorage.getItem(actCacheKey(sv.id));
+        if (!raw) return;
+        const o = JSON.parse(raw);
+        if (o && o.list) ACT.data[sv.id] = o;
+      } catch (e) { /* ignore */ }
+    });
+  }
+
+  function absUrl(u) {
+    if (!u) return '';
+    return u.indexOf('//') === 0 ? 'https:' + u : u;
+  }
+
+  function poolCacheKey(id) { return 'ba.pool.' + id; }
+
+  function warmPools() {
+    SERVERS.forEach(function (sv) {
+      if (POOL.data[sv.id]) return;
+      try {
+        const raw = localStorage.getItem(poolCacheKey(sv.id));
+        if (!raw) return;
+        const o = JSON.parse(raw);
+        if (o && o.list) POOL.data[sv.id] = o;
+      } catch (e) { /* ignore */ }
+    });
+  }
+
+  function POOL_URL(id) {
+    return POOL_API + '?order_by=-1&card_tag_id=&keyword=&kind_id=6&status=0&serverId=' + id;
+  }
+
+  function acceptPools(id, j) {
+    const list = (j && j.data) || [];
+    POOL.data[id] = { list: list, at: Date.now() };
+    try { localStorage.setItem(poolCacheKey(id), JSON.stringify({ list: list, at: Date.now() })); } catch (e) {}
+    POOL.failed[id] = 0;
+    return list;
+  }
+
+  function loadPools(force) {
+    const id = ACT.server;
+    const hit = POOL.data[id];
+    if (!force && hit && (Date.now() - hit.at) < ACT_CACHE_MS) return Promise.resolve(hit.list);
+    if (POOL.loading[id]) return POOL.loading[id];
+    const url = POOL_URL(id);
+    if (!window.BAFetch || !window.BAFetch.available()) {
+      POOL.loading[id] = fetch(url).then(function (r) { return r.json(); }).then(function (j) {
+        delete POOL.loading[id];
+        return acceptPools(id, j);
+      }).catch(function () { delete POOL.loading[id]; POOL.failed[id] = 1; return null; });
+      return POOL.loading[id];
+    }
+    POOL.loading[id] = window.BAFetch.json(url, { 'game-alias': 'ba' }).then(function (j) {
+      delete POOL.loading[id];
+      return acceptPools(id, j);
+    }).catch(function () { delete POOL.loading[id]; POOL.failed[id] = 1; return null; });
+    return POOL.loading[id];
+  }
+
+  function poolTags(x) {
+    return String((x && x.tag_id) || '').split(',')
+      .map(function (v) { return Number(String(v).trim()); })
+      .filter(function (v) { return v > 0; });
+  }
+
+  function fmtDate(ts, withTime) {
+    const d = new Date(ts * 1000);
+    const mm = d.getMonth() + 1;
+    const dd = d.getDate();
+    const t = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return mm + '/' + dd + (withTime === false ? '' : ' ' + t);
+  }
+
+  function actStatus(a, now) {
+    if (a.begin_at > now) return 2;       // 未开始
+    if (a.end_at < now) return 3;         // 已结束
+    return 1;                             // 进行中
+  }
+
+  function remainText(a, now) {
+    const diff = a.end_at - now;
+    if (diff <= 0) return '已结束';
+    const d = Math.floor(diff / 86400);
+    const h = Math.floor((diff % 86400) / 3600);
+    if (d >= 1) return '剩 ' + d + ' 天' + (h ? ' ' + h + ' 小时' : '');
+    const m = Math.floor((diff % 3600) / 60);
+    return '剩 ' + h + ' 小时' + (m ? ' ' + m + ' 分' : '');
+  }
+
+  /* ------------------------------------------------------------ 公告 */
+  const NOTICE_LIST_API = 'https://www.gamekee.com/v1/content/pageList';
+  const NOTICE_CACHE_MS = 10 * 60 * 1000;
+
+  const NT = {
+    list: null,
+    at: 0,
+    loading: false,
+    page: 1,
+    hasMore: false,
+    detail: null,       // 当前打开的公告
+    detailLoading: false
+  };
+
+  function noticeListUrl(page) {
+    return NOTICE_LIST_API + '?limit=20&page_no=' + page +
+      '&page_total=1&total=0&type=2&order_by=created_at&keyword=';
+  }
+
+  function loadNotices(force, page) {
+    if (!force && NT.list && NT.list.length && (Date.now() - NT.at) < NOTICE_CACHE_MS && !page) {
+      return Promise.resolve(NT.list);
+    }
+    if (NT.loading) return NT.loading;
+    const p = (page || 0);
+    const url = noticeListUrl(p);
+    const call = (window.BAFetch && window.BAFetch.available())
+      ? window.BAFetch.json(url, { 'game-alias': 'ba' })
+      : fetch(url).then(function (r) { return r.json(); });
+    NT.loading = call.then(function (j) {
+      NT.loading = false;
+      const list = (j && j.data) || [];
+      if (p > 0 && NT.list) NT.list = NT.list.concat(list);
+      else { NT.list = list; NT.at = Date.now(); }
+      NT.page = p;
+      NT.hasMore = list.length >= 20;
+      return NT.list;
+    }).catch(function () {
+      NT.loading = false;
+      return NT.list;
+    });
+    return NT.loading;
+  }
+
+  function noticeView() {
+    const list = NT.list;
+    let html = '<div style="height:12px"></div>';
+
+    if (!list) {
+      loadNotices(true).then(function () { if (state.tab === 'notice') render(); });
+      return html + '<div class="empty">正在获取公告…</div>';
+    }
+
+    html += list.map(function (n) {
+      const thumb = n.thumb ? String(n.thumb).split(',')[0] : '';
+      const img = thumb ? '<img data-murl="' + esc(absUrl(thumb)) + '" alt="">' : '<span class="noimg"></span>';
+      const date = fmtDate(n.created_at);
+      return '<button class="ntcard" data-act="nt-open" data-id="' + n.id + '">' +
+        '<span class="thumb">' + img + '</span>' +
+        '<span class="body">' +
+          '<span class="t">' + esc(n.title || '') + '</span>' +
+          '<span class="m">' + date + '</span>' +
+          '<span class="d">' + esc(n.summary || '') + '</span>' +
+        '</span>' +
+      '</button>';
+    }).join('');
+
+    if (NT.hasMore) {
+      html += '<button class="morebtn" data-act="nt-more">加载更多</button>';
+    }
+    html += '<div class="actfoot">数据来自 GameKee 公告区 · ' + fmtDate(Math.floor(NT.at / 1000)) +
+      ' 更新 <button class="linkbtn" data-act="nt-refresh">刷新</button></div>';
+
+    setTimeout(function () { hydrateRemoteImages(view); }, 0);
+    return html;
+  }
+
+  /* 富文本块 -> HTML */
+  function ntInline(node) {
+    if (!node) return '';
+    if (Array.isArray(node)) return node.map(ntInline).join('');
+    if (node.type === 'image') {
+      const src = absUrl(node.src || '');
+      return src ? '<img class="nt-img" data-murl="' + esc(src) + '" alt="">' : '';
+    }
+    if (node.type === 'link') {
+      const href = absUrl(node.href || node.url || '');
+      const txt = ntInline(node.children);
+      return '<a class="nt-link" data-act="nt-link" data-url="' + esc(href) + '">' + txt + '</a>';
+    }
+    if (typeof node.text === 'string') {
+      let t = esc(node.text);
+      if (!t) return '';
+      if (node.bold) t = '<b>' + t + '</b>';
+      if (node.color) t = '<span style="color:' + esc(node.color) + '">' + t + '</span>';
+      return t;
+    }
+    if (node.children) return ntInline(node.children);
+    return '';
+  }
+
+  function ntBlock(b) {
+    if (!b || !b.type) return '';
+    switch (b.type) {
+      case 'header1': return '<h2 class="nt-h1">' + ntInline(b.children) + '</h2>';
+      case 'header2': return '<h3 class="nt-h2">' + ntInline(b.children) + '</h3>';
+      case 'header3': return '<h4 class="nt-h3">' + ntInline(b.children) + '</h4>';
+      case 'divider': return '<hr class="nt-hr">';
+      case 'image': return '<div class="nt-imgwrap">' + ntInline([b]) + '</div>';
+      case 'table': {
+        const rows = (b.children || []).map(function (row) {
+          const cells = (row.children || []).map(function (c) { return '<td>' + ntInline(c.children) + '</td>'; }).join('');
+          return '<tr>' + cells + '</tr>';
+        }).join('');
+        return '<div class="nt-tablewrap"><table class="nt-table">' + rows + '</table></div>';
+      }
+      case 'flod': return '<div class="nt-p">' + ntInline(b.children) + '</div>';
+      default: return '<p class="nt-p">' + ntInline(b.children) + '</p>';
+    }
+  }
+
+  function ntRender(inner) {
+    if (!inner) return '<div class="empty">公告内容为空</div>';
+    const keys = Object.keys(inner).filter(function (k) { return /^\d+$/.test(k); })
+      .sort(function (a, b) { return Number(a) - Number(b); });
+    if (!keys.length) return ntBlock(inner);
+    return keys.map(function (k) { return ntBlock(inner[k]); }).join('');
+  }
+
+  function openNotice(id, preset) {
+    const meta = preset || (NT.list || []).filter(function (n) { return String(n.id) === String(id); })[0] || {};
+    NT.detail = {
+      id: id, loading: true, html: '',
+      title: meta.title || '',
+      date: meta.date || (meta.created_at ? fmtDate(meta.created_at) : ''),
+      source: meta.url || ''
+    };
+    renderNoticeOverlay();
+
+    const url = 'https://www.gamekee.com/v1/content/detail/' + id;
+    const call = (window.BAFetch && window.BAFetch.available())
+      ? window.BAFetch.json(url, { 'game-alias': 'ba' })
+      : fetch(url).then(function (r) { return r.json(); });
+    call.then(function (j) {
+      const d = (j && j.data) || {};
+      const cdn = d.content_cdn ? ('https:' + d.content_cdn) : '';
+      // 保留点进来时的标题（活动名）；只有没传标题时才用正文标题
+      if (!NT.detail.title) NT.detail.title = d.title || '';
+      if (!NT.detail.date && d.created_at) NT.detail.date = fmtDate(d.created_at);
+      if (!cdn) return null;
+      const getCdn = (window.BAFetch && window.BAFetch.available())
+        ? window.BAFetch.text(cdn, { Referer: 'https://www.gamekee.com/' })
+        : fetch(cdn).then(function (r) { return r.text(); });
+      return getCdn.then(function (txt) {
+        const o = JSON.parse(txt);
+        const inner = typeof o.content === 'string' ? JSON.parse(o.content) : o;
+        NT.detail.html = ntRender(inner);
+        NT.detail.loading = false;
+      });
+    }).catch(function (e) {
+      NT.detail.loading = false;
+      NT.detail.html = '<div class="empty">公告加载失败</div>';
+    }).then(function () {
+      NT.detail.loading = false;
+      if (NT.detail && String(NT.detail.id) === String(id)) renderNoticeOverlay();
+    });
+  }
+
+  function renderNoticeOverlay() {
+    const d = NT.detail;
+    if (!d) return;
+    let root = document.getElementById('nt-view');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'nt-view';
+      root.className = 'nt-root';
+      document.body.appendChild(root);
+    }
+    root.innerHTML =
+      '<div class="nt-head">' +
+        '<button class="navbtn back" data-act="nt-close">' + ICON.back + '</button>' +
+        '<div class="nt-title"><h2>' + esc(d.title || '公告') + '</h2>' +
+          '<span>' + esc(d.date || '') + '</span></div>' +
+      '</div>' +
+      '<div class="nt-body">' +
+        (d.loading ? '<div class="empty">正在加载内容…</div>' : (d.html || '')) +
+        (d.source ? '<div class="nt-src"><button class="linkbtn" data-act="nt-link" data-url="' + esc(d.source) + '">在浏览器打开原文</button></div>' : '') +
+        '<div style="height:30px"></div>' +
+      '</div>';
+    requestAnimationFrame(function () { root.classList.add('open'); });
+    setTimeout(function () { hydrateRemoteImages(root); }, 0);
+  }
+
+  function closeNotice() {
+    const root = document.getElementById('nt-view');
+    if (!root) return;
+    root.classList.remove('open');
+    setTimeout(function () { if (root.parentNode) root.parentNode.removeChild(root); }, 220);
+    NT.detail = null;
+  }
+
+  function overviewView() {
+    warmActivities();
+    warmPools();
+    const now = Math.floor(Date.now() / 1000);
+
+    let html = '<div style="height:12px"></div>';
+    // 服务器切换（活动与卡池共用）
+    html += '<div class="segwrap"><div class="seg">' + SERVERS.map(function (sv) {
+      return '<button class="' + (sv.id === ACT.server ? 'on' : '') + '" data-act="act-server" data-id="' + sv.id + '">' + sv.name + '</button>';
+    }).join('') + '</div></div>';
+
+    // 活动 / 卡池
+    html += '<div class="segwrap" style="margin-top:10px"><div class="seg">' +
+      '<button class="' + (state.overviewMode !== 'pool' ? 'on' : '') + '" data-act="ov-mode" data-m="activity">活动</button>' +
+      '<button class="' + (state.overviewMode === 'pool' ? 'on' : '') + '" data-act="ov-mode" data-m="pool">卡池</button>' +
+      '</div></div>';
+
+    html += (state.overviewMode === 'pool') ? poolSection(now) : activitySection(now);
+    return html;
+  }
+
+  /* ---------------------------------------------------------- 活动区块 */
+  function activitySection(now) {
+    const id = ACT.server;
+    const data = ACT.data[id];
+
+    let html = '<div class="chiprow" style="margin-top:10px">' + KINDS.map(function (k) {
+      return '<button class="chip ' + (k[0] === ACT.kind ? 'on' : '') + '" data-act="act-kind" data-k="' + k[0] + '">' + k[1] + '</button>';
+    }).join('') + '</div>';
+
+    if (!data) {
+      loadActivities(false).then(function () {
+        if (state.tab === 'overview' && state.overviewMode !== 'pool') rerenderOverview();
+      });
+      html += '<div class="empty">正在获取活动数据…</div>';
+      return html;
+    }
+
+    let list = data.list.slice();
+    if (ACT.kind) list = list.filter(function (a) { return a.activity_kind_id === ACT.kind; });
+    list.sort(function (a, b) { return a.begin_at - b.begin_at; });
+
+    const ongoing = list.filter(function (a) { return actStatus(a, now) === 1; });
+    const soon = list.filter(function (a) { return actStatus(a, now) === 2; });
+    const ended = list.filter(function (a) { return actStatus(a, now) === 3; })
+      .sort(function (a, b) { return b.end_at - a.end_at; });
+    const actWindow = (ACT.kind || ACT.allHistory ? 3650 : 14) * 86400;
+    const recentEnded = ended.filter(function (a) { return a.end_at > now - actWindow; });
+
+    html += '<div class="actgroup">';
+    if (ongoing.length) {
+      html += secTitle('进行中 · ' + ongoing.length);
+      html += ongoing.map(function (a) { return actCard(a, now, false); }).join('');
+    }
+    if (soon.length) {
+      html += secTitle('即将开始 · ' + soon.length);
+      html += soon.map(function (a) { return actCard(a, now, false); }).join('');
+    }
+    if (recentEnded.length) {
+      html += secTitle('最近结束 · ' + recentEnded.length);
+      const actShow = (ACT.allHistory || ACT.kind) ? 60 : 6;
+      html += recentEnded.slice(0, actShow).map(function (a) { return actCard(a, now, true); }).join('');
+      if (ended.length > actShow) {
+        html += '<button class="morebtn" data-act="act-more">' + (ACT.allHistory ? '收起' : '查看更早的记录') + '</button>';
+      }
+    }
+    if (!ongoing.length && !soon.length && !recentEnded.length) html += '<div class="empty">当前没有活动</div>';
+    html += '</div>';
+    html += '<div class="actfoot">数据来自 GameKee 活动日历 · ' + fmtDate(Math.floor(data.at / 1000)) +
+      ' 更新 <button class="linkbtn" data-act="act-refresh">刷新</button></div>';
+
+    setTimeout(hydrateRemoteImages, 0);
+    return html;
+  }
+
+  // 卡池名字 -> 学生（支持 繁中译名 / 别名 / 括号变体）
+  var NAME_IDX = null;   // 用 var：buildFacets 在声明之前就会被调用
+
+  // 常见 繁→简（学生名里出现过的那批字，只做无害映射）
+  var T2S = {
+    '繪': '绘', '綺': '绮', '羅': '罗', '皐': '皋', '導': '导', '覽': '览', '員': '员',
+    '響': '响', '種': '种', '優': '优', '愛': '爱', '學': '学', '園': '园', '體': '体',
+    '憐': '怜', '凜': '凛', '紗': '纱', '綾': '绫', '亞': '亚', '澤': '泽', '瀨': '濑',
+    '櫻': '樱', '織': '织', '純': '纯', '葉': '叶', '溫': '温', '禮': '礼', '樂': '乐',
+    '宮': '宫', '島': '岛', '貝': '贝', '陸': '陆', '霧': '雾', '華': '华', '龍': '龙',
+    '鳳': '凤', '靜': '静', '鏡': '镜', '緒': '绪', '綴': '缀', '織': '织', '紋': '纹'
+  };
+
+  function normName(v) {
+    var t = String(v || '');
+    t = t.replace(/[（(\[【]/g, '(').replace(/[）)\]】]/g, ')').replace(/\*/g, '(');
+    t = t.replace(/[·・．.\s\u3000]/g, '');
+    t = t.split('').map(function (ch) { return T2S[ch] || ch; }).join('');
+    return t.replace(/[!！]/g, '').toLowerCase();
+  }
+
+  // 去掉所有括号后的「纯名字」，用于 *恐怖 vs （恐怖）这类写法差异
+  function flatName(v) {
+    return normName(v).replace(/[()]/g, '');
+  }
+
+  function nameIndex() {
+    if (NAME_IDX) return NAME_IDX;
+    const map = {};
+    INDEX.forEach(function (s) {
+      const full = STUDENTS[s.id] || {};
+      const p = full.profile || {};
+      const names = [s.name].concat(s.aliases || [], [p.twName, p.cnName]);
+      names.forEach(function (n) {
+        const k = normName(n);
+        if (k && !map[k]) map[k] = s.id;
+        const f = flatName(n);
+        if (f && !map[f]) map[f] = s.id;
+      });
+    });
+    NAME_IDX = map;
+    return map;
+  }
+
+  // 返回 { id } / { candidates:[id] } / null
+  function resolveStudent(poolName) {
+    const idx = nameIndex();
+    const k = normName(poolName);
+    if (idx[k]) return { id: idx[k] };
+    const f = flatName(poolName);
+    if (idx[f]) return { id: idx[f] };
+
+    const m = k.match(/^(.*?)\((.*)\)$/);
+    if (m) {
+      const base = m[1];
+      const suf = m[2];
+      const cands = INDEX.filter(function (s) {
+        const n = normName(s.name);
+        return n.indexOf(base + '(') === 0 && n.indexOf(suf) >= 0;
+      });
+      if (cands.length === 1) return { id: cands[0].id };
+      if (cands.length > 1) return { candidates: cands.map(function (c) { return c.id; }) };
+    }
+
+    return null;
+  }
+
+  function openPoolStudent(pool, contentId, url) {
+    const r = resolveStudent(pool.name);
+    if (r && r.id) {
+      openDetail(String(r.id));
+      return true;
+    }
+    if (r && r.candidates && r.candidates.length > 1) {
+      showStudentPicker(r.candidates);
+      return true;
+    }
+    // 没收录（可能是刚出的新学生）：先看卡池公告，同时后台同步一次
+    if (contentId) {
+      openNotice(contentId, { title: pool.name_alias || pool.name || '', date: fmtDate(pool.start_at), url: url });
+    } else if (url) {
+      openExternal(url);
+    }
+    toast('学生资料尚未收录，正在同步…');
+    if (window.BASync && window.BASync.available()) {
+      window.BASync.check(syncOpts({ force: true })).then(afterSync);
+    }
+    return false;
+  }
+
+  function showStudentPicker(ids) {
+    closeStudentPicker();
+    const root = document.createElement('div');
+    root.id = 'pick-modal';
+    root.className = 'modal-root';
+    root.innerHTML =
+      '<div class="modal-backdrop" data-act="pick-close"></div>' +
+      '<div class="modal" role="dialog">' +
+        '<div class="modal-head"><h3>选择学生</h3><div class="modal-sub">卡池里有多个同名形态</div></div>' +
+        '<div class="modal-body" style="padding-bottom:12px">' +
+          ids.map(function (id) {
+            const s = BY_ID[id] || {};
+            return '<button class="rowlink" data-act="pick-item" data-id="' + id + '" style="width:100%;text-align:left">' +
+              '<span>' + esc(s.name || id) + '</span><span class="r">›</span></button>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(root);
+    requestAnimationFrame(function () { root.classList.add('open'); });
+  }
+
+  function closeStudentPicker() {
+    const root = document.getElementById('pick-modal');
+    if (root && root.parentNode) root.parentNode.removeChild(root);
+  }
+
+  // 从 WIKI 链接里取 content id（形如 /ba/725953.html 或 /ba/725953）
+  function contentIdOf(url) {
+    const m = String(url || '').match(/\/ba\/(\d{3,})/);
+    return m ? m[1] : '';
+  }
+
+  function actCard(a, now, dim) {
+    const pic = a.picture ? '<img data-murl="' + esc(absUrl(a.picture)) + '" alt="">' : '<span class="noimg"></span>';
+    const st = actStatus(a, now);
+    const cid = contentIdOf(a.link_url);
+    const openAttr = cid
+      ? 'data-act="doc-open" data-id="' + cid + '" data-title="' + esc(a.title || '') + '" data-date="' + esc(fmtDate(a.begin_at)) + '" data-url="' + esc(absUrl(a.link_url)) + '"'
+      : 'data-act="act-open" data-url="' + esc(absUrl(a.link_url || '')) + '"';
+    return '<button class="actcard' + (dim ? ' dim' : '') + '" ' + openAttr + '>' +
+      '<span class="thumb">' + pic + '</span>' +
+      '<span class="body">' +
+        '<span class="t">' + esc(a.title) + '</span>' +
+        '<span class="m">' + esc(a.activity_kind_name || '') + ' · ' + fmtDate(a.begin_at) + ' → ' + fmtDate(a.end_at) + '</span>' +
+        '<span class="s ' + (st === 1 ? 'live' : (st === 2 ? 'soon' : 'done')) + '">' +
+          (st === 1 ? remainText(a, now) : (st === 2 ? '未开始' : '已结束')) +
+        '</span>' +
+      '</span>' +
+    '</button>';
+  }
+
+  /* ---------------------------------------------------------- 卡池区块 */
+  function poolSection(now) {
+    const id = ACT.server;
+    const data = POOL.data[id];
+
+    let html = '';
+    html += '<div class="chiprow" style="margin-top:10px">' +
+      '<button class="chip ' + (POOL.tag === 0 ? 'on' : '') + '" data-act="pool-tag" data-k="0">全部</button>' +
+      Object.keys(POOL_TAGS).map(function (k) {
+        return '<button class="chip ' + (POOL.tag === Number(k) ? 'on' : '') + '" data-act="pool-tag" data-k="' + k + '">' + POOL_TAGS[k] + '</button>';
+      }).join('') + '</div>';
+
+    if (!data) {
+      loadPools(false).then(function () {
+        if (state.tab === 'overview' && state.overviewMode === 'pool') rerenderOverview();
+      });
+      html += '<div class="empty">正在获取卡池数据…</div>';
+      return html;
+    }
+
+    let list = data.list.slice();
+    if (POOL.tag) list = list.filter(function (x) { return poolTags(x).indexOf(POOL.tag) >= 0; });
+    list.sort(function (a, b) { return a.start_at - b.start_at; });
+
+    const live = list.filter(function (x) { return x.start_at <= now && x.end_at >= now; });
+    const soon = list.filter(function (x) { return x.start_at > now; });
+    const ended = list.filter(function (x) { return x.end_at < now; })
+      .sort(function (a, b) { return b.end_at - a.end_at; });
+    const poolWindow = (POOL.tag || POOL.allHistory ? 3650 : 14) * 86400;
+    const recent = ended.filter(function (x) { return x.end_at > now - poolWindow; });
+
+    html += '<div class="actgroup">';
+    if (live.length) {
+      html += secTitle('进行中 · ' + live.length);
+      html += live.map(function (x) { return poolCard(x, now, false); }).join('');
+    }
+    if (soon.length) {
+      html += secTitle('即将开始 · ' + soon.length);
+      html += soon.map(function (x) { return poolCard(x, now, false); }).join('');
+    }
+    if (recent.length) {
+      html += secTitle('最近结束 · ' + recent.length);
+      const poolShow = (POOL.allHistory || POOL.tag) ? 60 : 6;
+      html += recent.slice(0, poolShow).map(function (x) { return poolCard(x, now, true); }).join('');
+      if (ended.length > poolShow) {
+        html += '<button class="morebtn" data-act="pool-more">' + (POOL.allHistory ? '收起' : '查看更早的记录') + '</button>';
+      }
+    }
+    if (!live.length && !soon.length && !recent.length) html += '<div class="empty">当前没有卡池</div>';
+    html += '</div>';
+
+    html += '<div class="actfoot">数据来自 GameKee 卡池日历 · ' + fmtDate(Math.floor(data.at / 1000)) +
+      ' 更新 <button class="linkbtn" data-act="pool-refresh">刷新</button></div>';
+
+    setTimeout(hydrateRemoteImages, 0);
+    return html;
+  }
+
+  function poolCard(x, now, dim) {
+    const img = absUrl(x.image_list || x.icon || '');
+    const pic = img ? '<img data-murl="' + esc(img) + '" alt="">' : '<span class="noimg"></span>';
+    const tags = poolTags(x).map(function (t) { return POOL_TAGS[t]; }).filter(Boolean);
+    const tagName = tags[0] || '';
+    const st = x.start_at > now ? 2 : (x.end_at < now ? 3 : 1);
+    const sub = [x.name_alias, fmtDate(x.start_at) + ' → ' + fmtDate(x.end_at)].filter(Boolean).join(' · ');
+    const cid = contentIdOf(x.link_url);
+    const openAttr = 'data-act="pool-student" data-pid="' + esc(x.id) + '" data-cid="' + esc(cid) + '"' +
+      ' data-name="' + esc(x.name || '') + '" data-alias="' + esc(x.name_alias || '') + '"' +
+      ' data-start="' + esc(String(x.start_at)) + '" data-url="' + esc(absUrl(x.link_url || '')) + '"';
+    return '<button class="actcard' + (dim ? ' dim' : '') + '" ' + openAttr + '>' +
+      '<span class="thumb wide">' + pic + '</span>' +
+      '<span class="body">' +
+        '<span class="t">' + esc(x.name || '') + (tagName ? ' <i class="ptag">' + tagName + '</i>' : '') + '</span>' +
+        '<span class="m">' + esc(sub) + '</span>' +
+        '<span class="s ' + (st === 1 ? 'live' : (st === 2 ? 'soon' : 'done')) + '">' +
+          (st === 1 ? remainText(x, now) : (st === 2 ? '未开始' : '已结束')) +
+        '</span>' +
+      '</span>' +
+    '</button>';
+  }
+
+  function rerenderOverview() {
+    renderTop();
+    view.innerHTML = overviewView();
+  }
+
+  // 远程图片（CDN 校验 Referer）统一走原生桥取回后显示
+  function hydrateRemoteImages(rootEl) {
+    const imgs = Array.prototype.slice.call((rootEl || view).querySelectorAll('img[data-murl]'));
+    imgs.forEach(function (img) {
+      const url = img.getAttribute('data-murl');
+      img.removeAttribute('data-murl');
+      if (!url) return;
+      mediaBlobUrl(absUrl(url)).then(function (blob) {
+        img.src = blob;
+      }).catch(function () {
+        img.style.opacity = '.25';
+      });
+    });
   }
 
   function listView() {
@@ -1149,9 +1839,20 @@
   }
 
   function renderTop() {
-    const titles = { students: ['STUDENT DEX', '学生图鉴'], schools: ['ACADEMY', '学院'], favorites: ['FAVORITES', '收藏'], more: ['ABOUT', '更多'] };
+    const titles = { overview: ['DASHBOARD', '总览'], notice: ['NOTICE', '公告'], students: ['STUDENT DEX', '学生图鉴'], schools: ['ACADEMY', '学院'], favorites: ['FAVORITES', '收藏'], more: ['ABOUT', '更多'] };
     const t = titles[state.tab];
-    const count = state.tab === 'students' ? (filtered().length + ' / ' + INDEX.length) : '';
+    let count = '';
+    if (state.tab === 'students') count = filtered().length + ' / ' + INDEX.length;
+    else if (state.tab === 'overview') {
+      const now = Math.floor(Date.now() / 1000);
+      if (state.overviewMode === 'pool') {
+        const pd = POOL.data[ACT.server];
+        if (pd) count = '卡池进行中 ' + pd.list.filter(function (x) { return x.start_at <= now && x.end_at >= now; }).length;
+      } else {
+        const d = ACT.data[ACT.server];
+        if (d) count = '进行中 ' + d.list.filter(function (a) { return a.begin_at <= now && a.end_at >= now; }).length;
+      }
+    }
     topbar.innerHTML =
       '<div class="topbar-title"><h1><small>' + t[0] + '</small>' + t[1] + '</h1>' +
       '<div class="count">' + count + '</div></div>' +
@@ -1175,7 +1876,9 @@
     } else {
       renderTop();
       let html = '';
-      if (state.tab === 'students') html = listView();
+      if (state.tab === 'overview') html = overviewView();
+      else if (state.tab === 'notice') html = noticeView();
+      else if (state.tab === 'students') html = listView();
       else if (state.tab === 'schools') html = schoolsView();
       else if (state.tab === 'favorites') html = favView();
       else html = moreView();
@@ -1412,6 +2115,43 @@
     }
     if (act === 'dt') { stopVoice(); closeMediaViewer(); state.detailTab = btn.dataset.t; state.voiceCat = null; rerenderBody(); detailEl.scrollTop = 0; return; }
     if (act === 'lv') { state.skillLv[btn.dataset.i] = Number(btn.dataset.lv); rerenderBody(); return; }
+    if (act === 'pool-student') {
+      const pool = {
+        id: btn.dataset.pid,
+        name: btn.dataset.name,
+        name_alias: btn.dataset.alias,
+        start_at: Number(btn.dataset.start) || 0
+      };
+      openPoolStudent(pool, btn.dataset.cid, btn.dataset.url);
+      return;
+    }
+    if (act === 'pick-close') { closeStudentPicker(); return; }
+    if (act === 'pick-item') { closeStudentPicker(); openDetail(String(btn.dataset.id)); return; }
+    if (act === 'nt-open') { openNotice(btn.dataset.id); return; }
+    if (act === 'doc-open') {
+      openNotice(btn.dataset.id, { title: btn.dataset.title, date: btn.dataset.date, url: btn.dataset.url });
+      return;
+    }
+    if (act === 'nt-close') { closeNotice(); return; }
+    if (act === 'nt-more') { loadNotices(false, (NT.page || 0) + 1).then(function () { render(); }); return; }
+    if (act === 'nt-refresh') { loadNotices(true).then(function () { render(); }); toast('正在刷新公告…'); return; }
+    if (act === 'nt-link') { const u = btn.dataset.url; if (u) openExternal(u); return; }
+    if (act === 'ov-mode') { state.overviewMode = btn.dataset.m === 'pool' ? 'pool' : 'activity'; if (state.tab === 'overview') rerenderOverview(); return; }
+    if (act === 'pool-tag') { POOL.tag = Number(btn.dataset.k) || 0; POOL.showEnded = false; if (state.tab === 'overview') rerenderOverview(); return; }
+    if (act === 'pool-more') { POOL.allHistory = !POOL.allHistory; if (state.tab === 'overview') rerenderOverview(); return; }
+    if (act === 'pool-refresh') { loadPools(true).then(function () { if (state.tab === 'overview') rerenderOverview(); }); toast('正在刷新卡池…'); return; }
+    if (act === 'pool-open') { const u = btn.dataset.url; if (u) openExternal(u); return; }
+    if (act === 'act-server') {
+      ACT.server = Number(btn.dataset.id);
+      ACT.showEnded = false;
+      POOL.showEnded = false;
+      if (state.tab === 'overview') rerenderOverview();
+      return;
+    }
+    if (act === 'act-kind') { ACT.kind = Number(btn.dataset.k); if (state.tab === 'overview') rerenderOverview(); return; }
+    if (act === 'act-more') { ACT.allHistory = !ACT.allHistory; if (state.tab === 'overview') rerenderOverview(); return; }
+    if (act === 'act-refresh') { loadActivities(true).then(function () { if (state.tab === 'overview') rerenderOverview(); }); toast('正在刷新活动…'); return; }
+    if (act === 'act-open') { const u = btn.dataset.url; if (u) openExternal(u); return; }
     if (act === 'vcat') { stopVoice(); state.voiceCat = btn.dataset.c; rerenderBody(); return; }
     if (act === 'vtrans') { state.voiceTrans = btn.dataset.m; rerenderBody(); return; }
     if (act === 'vplay') { playVoice(btn); return; }
@@ -1757,6 +2497,8 @@
   }
 
   tabbar.innerHTML = [
+    ['overview', '总览', ICON.overview],
+    ['notice', '公告', ICON.notice],
     ['students', '学生', ICON.students],
     ['schools', '学院', ICON.school],
     ['favorites', '收藏', ICON.heart],

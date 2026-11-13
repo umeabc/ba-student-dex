@@ -114,7 +114,7 @@ class MainActivity : ComponentActivity() {
                 if (isFinishing || isDestroyed || current !== webView) return@evaluateJavascript
                 when (result?.removeSurrounding("\"")) {
                     "root" -> finish()
-                    "modal", "sheet", "detail" -> Unit
+                    "modal", "sheet", "detail", "notice" -> Unit
                     else -> fallbackBack(current)
                 }
             }
@@ -223,6 +223,8 @@ var m=document.getElementById('update-modal');
 if(m){var b=m.querySelector('[data-act="modal-close"]'); if(b){b.click(); return 'modal';}}
 var s=document.getElementById('sheet');
 if(s && !s.hidden){var f=s.querySelector('[data-act="filter-close"]'); if(f){f.click(); return 'sheet';}}
+var n=document.getElementById('nt-view');
+if(n && n.classList.contains('open')){var nc=n.querySelector('[data-act="nt-close"]'); if(nc){nc.click(); return 'notice';}}
 var d=document.getElementById('detail');
 if(d && d.classList.contains('in')){var k=d.querySelector('[data-act="back"]'); if(k){k.click(); return 'detail';}}
 return 'root';

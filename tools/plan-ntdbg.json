@@ -1,0 +1,13 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];",
+  "shots": [
+    { "name": "ND1", "wait": 2600, "after": 300,
+      "js": "(function(){var m=document.getElementById('update-modal');if(m){var b=document.querySelector('[data-act=modal-close]');if(b)b.click();}document.querySelector('[data-tab=notice]').click();return 'ok'})()" },
+    { "name": "ND2", "after": 5000, "wait": 200,
+      "js": "(function(){document.querySelector('.ntcard').click();return 'ok'})()" },
+    { "name": "ND3", "after": 5000, "wait": 300,
+      "js": "(function(){var h=document.querySelector('.nt-head');if(!h)return{noHead:true};var btn=h.querySelector('.navbtn');var r=btn?btn.getBoundingClientRect():null;var cs=btn?getComputedStyle(btn):null;return {headHTML:h.innerHTML.slice(0,160),btn:r?{x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)}:null,pos:cs?cs.position:null,display:cs?cs.display:null}})()" }
+  ]
+}

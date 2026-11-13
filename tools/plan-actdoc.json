@@ -1,0 +1,17 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390,
+  "height": 844,
+  "dpr": 3,
+  "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "AC1-open", "wait": 2600, "after": 300,
+      "js": "(function(){var m=document.getElementById('update-modal');if(m){var b=document.querySelector('[data-act=modal-close]');if(b)b.click();}document.querySelector('[data-tab=overview]').click();return 'ok'})()" },
+    { "name": "AC2-click-act", "after": 6000, "wait": 200,
+      "js": "(function(){var c=document.querySelector('.actcard[data-act=doc-open]');if(!c)return{noCard:true,acts:document.querySelectorAll('.actcard').length};c.click();return {id:c.dataset.id,title:c.dataset.title}})()" },
+    { "name": "AC3-doc", "after": 8000, "wait": 300,
+      "js": "(function(){var r=document.getElementById('nt-view');if(!r)return{noOverlay:true};var b=r.querySelector('.nt-body');var head=r.querySelector('.nt-head');var cs=getComputedStyle(head);return {title:(r.querySelector('.nt-title h2')||{}).textContent,padTop:cs.paddingTop,blocks:{p:b.querySelectorAll('.nt-p').length,img:b.querySelectorAll('.nt-img').length,table:b.querySelectorAll('.nt-table').length},src:!!r.querySelector('.nt-src'),errs:window.__errs}})()" },
+    { "name": "AC4-doc-shot", "after": 400, "wait": 100, "js": "'x'" }
+  ]
+}

@@ -1,0 +1,18 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];window.addEventListener('error',function(e){window.__errs.push('error: '+e.message)});",
+  "shots": [
+    { "name": "OV1-open", "wait": 2600, "after": 400,
+      "js": "(function(){var m=document.getElementById('update-modal');if(m){var b=document.querySelector('[data-act=modal-close]');if(b)b.click();}var t=document.querySelector('[data-tab=overview]');if(!t)return{noTab:true};t.click();return 'ok'})()" },
+    { "name": "OV2-loading", "after": 700, "wait": 100,
+      "js": "(function(){return {tabs:Array.from(document.querySelectorAll('.tabbar button')).map(function(b){return b.textContent}),title:(document.querySelector('.topbar-title h1')||{}).textContent,empty:(document.querySelector('.empty')||{}).textContent}})()" },
+    { "name": "OV3-loaded", "after": 6000, "wait": 300,
+      "js": "(function(){var cards=document.querySelectorAll('.actcard');var secs=Array.from(document.querySelectorAll('.section-title')).map(function(x){return x.textContent});return {cards:cards.length,sections:secs,first:cards[0]?cards[0].querySelector('.t').textContent:null,status:cards[0]?cards[0].querySelector('.s').textContent:null,imgs:document.querySelectorAll('.actcard .thumb img').length,loaded:Array.from(document.querySelectorAll('.actcard .thumb img')).filter(function(i){return i.src.indexOf('blob:')===0}).length,errs:window.__errs}})()" },
+    { "name": "OV4-shot", "after": 300, "wait": 100, "js": "'x'" },
+    { "name": "OV5-server", "after": 600, "wait": 100,
+      "js": "(function(){var b=Array.from(document.querySelectorAll('[data-act=act-server]')).filter(function(x){return x.textContent.indexOf('国服')>=0})[0];if(!b)return{noBtn:true};b.click();return 'ok'})()" },
+    { "name": "OV6-cn", "after": 6000, "wait": 300,
+      "js": "(function(){var cards=document.querySelectorAll('.actcard');return {cards:cards.length,first:cards[0]?cards[0].querySelector('.t').textContent:null,errs:window.__errs}})()" }
+  ]
+}

@@ -1,0 +1,13 @@
+﻿{
+  "url": "http://127.0.0.1:8123/_test-update.html",
+  "width": 390, "height": 844, "dpr": 3, "outDir": "shots",
+  "preScript": "window.__errs=[];",
+  "shots": [
+    { "name": "OW1", "wait": 2600, "after": 300,
+      "js": "(function(){var m=document.getElementById('update-modal');if(m){var b=document.querySelector('[data-act=modal-close]');if(b)b.click();}document.querySelector('[data-tab=overview]').click();return 'ok'})()" },
+    { "name": "OW2-scroll", "after": 6500, "wait": 200,
+      "js": "(function(){window.scrollTo(0, document.body.scrollHeight - 900);return {sections:Array.from(document.querySelectorAll('.section-title')).map(function(x){return x.textContent}),more:!!document.querySelector('[data-act=act-more]'),foot:(document.querySelector('.actfoot')||{}).textContent}})()" },
+    { "name": "OW3-shot", "after": 1200, "wait": 200, "js": "'x'" },
+    { "name": "OW4-dark", "media": "dark", "after": 500, "wait": 200, "js": "'x'" }
+  ]
+}
