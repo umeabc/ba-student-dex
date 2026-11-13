@@ -1,7 +1,7 @@
-# Android 端复核与验证报告（1.0.3）
+# Android 端复核与验证报告（1.0.4）
 
 - 验证环境：雷电模拟器 LDPlayer14，Android 14（API 34），系统 WebView 146，900×1600 @320dpi（dpr=2）
-- 结论：**1.0.3 可安装、可离线（缓存后）、支持应用内更新**；release 签名产物已发布。
+- 结论：**1.0.4 可安装、可离线（缓存后）、支持应用内更新**；release 签名产物已发布。
 
 ---
 
@@ -9,9 +9,9 @@
 
 | 项 | 值 |
 | --- | --- |
-| Release APK | `dist/StudentDex-1.0.3-android.apk`（14,223,615 字节） |
-| SHA-256 | `6f23f96565e786c378a4f7ce85c1f8bdabc50817c5819003e61c4ef2f716b6aa` |
-| 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.3`、versionCode `3` |
+| Release APK | `dist/StudentDex-1.0.4-android.apk`（14,261,679 字节） |
+| SHA-256 | `c0cfba84dd574ec0b376c73dadace389b1c93ae847a67fc086be058b5c7a3214` |
+| 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.4`、versionCode `4` |
 | SDK | minSdk 24，targetSdk 35，compileSdk 35 |
 | 签名 | release keystore（`CN=StudentDex, OU=Android, O=StudentDex`），APK Signature Scheme v2 |
 
@@ -51,7 +51,16 @@ D:/leidian/LDPlayer14/adb.exe install -r app/build/outputs/apk/release/app-relea
 | --- | --- | --- |
 | ![列表](screenshots/list.png) | ![离线资源](screenshots/offline-pack.png) | ![影画](screenshots/media.png) |
 
-## 3.1 1.0.3 同步的上游修复
+## 3.1 1.0.4 同步的上游功能
+
+- 新增「总览」：日服/国服/国际服活动日历（进行中/即将开始/最近结束 + 类型筛选 + 封面）
+- 新增「卡池」：与活动分开、共用三服切换、标签筛选与剩余时间
+- 新增「公告」：App 内阅读富文本公告（段落/图片/表格），不再跳浏览器
+- 卡池点进学生直达图鉴（名字/别名/繁中译名/去括号，多形态弹选择）
+- 历史浏览与多标签支持
+- 外壳适配：返回键新增 `#nt-view` 分支（公告阅读器先关闭，再关详情，最后退出）
+
+## 3.2 1.0.3 同步的上游修复
 
 - 同步不再一次只处理 6 个（`MAX_NEW_PER_RUN` 6→200），实测一次点击「更新 5 名」跑完
 - 同步遇到系统「允许联网」弹窗时自动等待重试
