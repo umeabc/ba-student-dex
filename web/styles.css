@@ -608,6 +608,11 @@ a { color: var(--accent); text-decoration: none; }
   transition: all 0.15s;
 }
 .seg button.on { background: var(--accent-soft); color: var(--accent); }
+.notice-server-filter .seg button { flex: 1; min-width: 0; min-height: 44px; white-space: nowrap; }
+/* 这个筛选条在 .view 里，view 自带 16px 页边距；负边距把毛玻璃条拉成整屏宽，
+   内部 padding 再补回来，按钮才会和下面的卡片左边缘对齐
+   （详情页的 .segwrap 父容器没有页边距，不要加这个负边距） */
+.segwrap.notice-server-filter { margin: 0 -16px; }
 
 .detail-body { padding: 4px 16px calc(40px + var(--safe-b)); }
 
@@ -960,6 +965,41 @@ a { color: var(--accent); text-decoration: none; }
 .mv-close:active { background: rgba(255,255,255,.3); }
 
 /* ---------------------------------------------------------------- 总览 · 活动 */
+.ov-dd-filter {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; flex-wrap: nowrap; gap: 6px;
+  min-width: 0; margin: 0 -16px; padding: 8px 16px;
+  background: rgba(238, 243, 250, 0.9);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  border-bottom: 1px solid var(--line);
+}
+.ov-dd { position: relative; flex: 1 1 0; min-width: 0; }
+/* 文案长度不同：服务器列要放得下「国际服」，类型列要放得下「总力大决」，
+   320dp 下也按这个比例分配，仍保持单行不溢出 */
+.ov-dd[data-dd="server"] { flex: 1.1 1 0; }
+.ov-dd[data-dd="kind"] { flex: 1.25 1 0; }
+.ov-dd-toggle, .ov-dd-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; text-align: left;
+  background: var(--card); color: var(--ink); font-size: 14px; font-weight: 600;
+}
+.ov-dd-toggle { border: 1px solid var(--line); border-radius: 14px; padding: 10px 10px; gap: 4px; }
+.ov-dd-value, .ov-dd-option span:first-child {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.ov-dd-caret, .ov-dd-option span:last-child { flex: none; color: var(--sub); }
+.ov-dd-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 41;
+  max-height: 40vh; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: var(--shadow);
+}
+.ov-dd-menu[hidden] { display: none; }
+.ov-dd-option + .ov-dd-option { border-top: 1px solid var(--line); }
+.ov-dd-option[aria-selected="true"] { background: var(--line); font-weight: 800; }
+.ov-dd-toggle:focus-visible, .ov-dd-option:focus-visible { outline: 2px solid var(--sub); outline-offset: -3px; }
 .actgroup { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .actcard {
   display: flex; gap: 11px; align-items: stretch; width: 100%; text-align: left;

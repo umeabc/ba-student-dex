@@ -1,7 +1,7 @@
-# Android 端复核与验证报告（1.0.4）
+# Android 端复核与验证报告（1.0.5）
 
 - 验证环境：雷电模拟器 LDPlayer14，Android 14（API 34），系统 WebView 146，900×1600 @320dpi（dpr=2）
-- 结论：**1.0.4 可安装、可离线（缓存后）、支持应用内更新**；release 签名产物已发布。
+- 结论：**1.0.5 可安装、可离线（缓存后）、支持应用内更新**；release 签名产物已发布。
 
 ---
 
@@ -9,9 +9,9 @@
 
 | 项 | 值 |
 | --- | --- |
-| Release APK | `dist/StudentDex-1.0.4-android.apk`（14,261,679 字节） |
-| SHA-256 | `c0cfba84dd574ec0b376c73dadace389b1c93ae847a67fc086be058b5c7a3214` |
-| 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.4`、versionCode `4` |
+| Release APK | `dist/StudentDex-1.0.5-android.apk`（14,266,667 字节） |
+| SHA-256 | `c24e444bf949dbfc7cfb113f32bedb15e4df8752c6b5fe7fba019fdeb0b71b7f` |
+| 包名 / 版本 | `com.sensei.studentdex` / versionName `1.0.5`、versionCode `5` |
 | SDK | minSdk 24，targetSdk 35，compileSdk 35 |
 | 签名 | release keystore（`CN=StudentDex, OU=Android, O=StudentDex`），APK Signature Scheme v2 |
 
@@ -50,6 +50,64 @@ D:/leidian/LDPlayer14/adb.exe install -r app/build/outputs/apk/release/app-relea
 | 列表（按需回源） | 离线资源入口 | 影画页 |
 | --- | --- | --- |
 | ![列表](screenshots/list.png) | ![离线资源](screenshots/offline-pack.png) | ![影画](screenshots/media.png) |
+
+## 3.0 1.0.5 的改动
+
+### 3.0.1 总览筛选改为一行的三个下拉
+
+原来「日服/国服/国际服」占一行分段、「活动/卡池」又占一行分段、「活动类型」再单占一个全宽下拉——三行才放得下三个筛选，而且窄屏下 chip 会被横向截断。现在合并成一行三个等宽下拉：
+
+| # | 项 | 做法 | 实测 |
+| --- | --- | --- | --- |
+| 1 | 布局 | 一行三列下拉，`flex: 1 1 0; min-width: 0`，容器 `flex-wrap: nowrap` | 450/360/320dp 三档均单行不换行、`scrollWidth` 无横向溢出 |
+| 2 | 文案 | 按钮只显示当前值 + `▾`，去掉「活动类型：」前缀 | — |
+| 3 | 列宽 | 按文案长度分配：服务器 `1.1`、模式 `1`、类型 `1.25` | 320dp 下「国际服」可用 60 / 需 42，「总力大决」可用 72 / 需 56，均不省略 |
+| 4 | 卡池模式 | 活动类型对卡池无意义，只渲染前两个下拉 | 两列撑满，切回活动模式第三列恢复 |
+| 5 | 结构 | 筛选行上提到 `overviewView()`，`activitySection()` 只出列表 | 「正在获取活动数据…」时筛选行仍可用 |
+| 6 | 交互 | 泛化成通用下拉组件，一次只开一个；点外部 / Esc / 切 Tab / `pagehide` / 焦点移出关闭 | 四个关闭路径全部实测；菜单 `z-index:41` 压在卡片上不被裁 |
+
+旧的 `.act-kind-*` 单例实现（含 `closeActKindMenu()` 与四处 `closest('.act-kind-filter')` 判断）已删除，无残留引用。
+
+### 3.0.2 公告按服务器筛选
+
+公告接口确实支持 `server_id`（15 日服 / 16 国服 / 17 国际服），之前没测出来是方法问题——直接抓原始响应可以确认 `server_id=16` 返回「【国服】阿洛娜的日程笔记（第32期）」。
+
+| # | 项 | 结果 |
+| --- | --- | --- |
+| 1 | 分段控件 | 顶部 `全部 / 日服 / 国服 / 国际服`，默认全部 |
+| 2 | 切到国服 | 首条变「【国服】阿洛娜的日程笔记（第32期）」 |
+| 3 | 切回全部 | 恢复混合列表，无数据残留 |
+| 4 | 各服独立状态 | 每个服务器单独维护 list / page / hasMore / 时间，快速来回切不串数据 |
+| 5 | 「加载更多」/ 刷新 | 回调校验当前服务器与 Tab，迟到的响应不会覆盖 |
+| 6 | 断网重试 | 首次失败显示「公告加载失败 重试」，不再永久卡在加载中 |
+
+顺带修掉了公告详情的异步竞态：关闭浮层后请求回调仍会写 `NT.detail`（可能空引用），A→B 快速切换会被迟到的响应串掉标题/正文。四个回调点都加了「当前公告 id 校验」。
+
+### 3.0.3 吸顶筛选条对齐修正
+
+`.segwrap` 自带 16px 内边距，而它所在的 `.view` 已经有 16px 页边距，导致按钮实际缩进 32dp、比下面的卡片多缩进 16dp。改成毛玻璃条整屏宽（`margin: 0 -16px`）、内容回到 16dp：
+
+| 页面 | 修正前（条 / 按钮） | 修正后 |
+| --- | --- | --- |
+| 总览筛选行 | 16→344 / 32 | 0→360 / 16，与卡片 16 对齐 |
+| 公告服务器筛选 | 16→344 / 32 | 0→360 / 16 |
+| 学生详情 Tab | 0→360 / 16（父容器无页边距） | 不变，故负边距只作用于 `.segwrap.notice-server-filter` |
+
+三处实测 `document.documentElement.scrollWidth === innerWidth`，无横向溢出。
+
+### 3.0.4 1.0.5 回归验证
+
+| # | 项 | 结果 |
+| --- | --- | --- |
+| 1 | 六个 Tab 全切换 | 无 JS 报错，内容正常渲染 |
+| 2 | 三个下拉各选项 | 文案、列表、分组标题同步更新 |
+| 3 | 单菜单约束 | 开服务器再点模式，服务器自动关 |
+| 4 | 关闭路径 | 点外部 / Esc / 切 Tab 均关闭 |
+| 5 | 卡池 ↔ 活动切换 | 第三列出现/消失正常，无抖动 |
+| 6 | 320dp 最小宽度 | 最长文案不省略、不换行 |
+| 7 | release 包 | 签名沿用 `63ea77e9…`，versionName 1.0.5 / versionCode 5；真机触摸与下拉交互正常 |
+
+注意：release 包按设计只在 debuggable 时开启 `setWebContentsDebuggingEnabled`，因此 release 版无法用 CDP 调试，上述 release 验证走截图 + `input tap`。
 
 ## 3.1 1.0.4 同步的上游功能
 

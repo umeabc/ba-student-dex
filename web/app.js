@@ -3,7 +3,7 @@
   'use strict';
 
   const APP_NAME = '什亭之匣';
-  const APP_VERSION = 'V1.0.4';
+  const APP_VERSION = 'V1.0.5';
 
   // 内置数据（打包进 App），联网同步到的新学生会追加到这里
   const INDEX = (window.BA_INDEX || []).slice();
@@ -450,54 +450,79 @@
   const NOTICE_CACHE_MS = 10 * 60 * 1000;
 
   const NT = {
-    list: null,
-    at: 0,
-    loading: false,
-    page: 1,
-    hasMore: false,
+    server: 0,
+    data: {},
     detail: null,       // 当前打开的公告
     detailLoading: false
   };
 
-  function noticeListUrl(page) {
+  function emptyNoticeData() {
+    return { list: null, at: 0, loading: false, page: 1, hasMore: false, error: false };
+  }
+
+  function noticeData(server) {
+    const id = server === undefined ? NT.server : server;
+    if (!NT.data[id]) NT.data[id] = emptyNoticeData();
+    return NT.data[id];
+  }
+
+  function noticeListUrl(page, server) {
+    const id = server === undefined ? NT.server : server;
     return NOTICE_LIST_API + '?limit=20&page_no=' + page +
-      '&page_total=1&total=0&type=2&order_by=created_at&keyword=';
+      '&page_total=1&total=0&type=2&order_by=created_at&keyword=' + (id ? '&server_id=' + id : '');
   }
 
   function loadNotices(force, page) {
-    if (!force && NT.list && NT.list.length && (Date.now() - NT.at) < NOTICE_CACHE_MS && !page) {
-      return Promise.resolve(NT.list);
+    const server = NT.server;
+    const data = noticeData(server);
+    if (!force && data.list && data.list.length && (Date.now() - data.at) < NOTICE_CACHE_MS && !page) {
+      return Promise.resolve(data.list);
     }
-    if (NT.loading) return NT.loading;
+    if (data.loading) return data.loading;
     const p = (page || 0);
-    const url = noticeListUrl(p);
+    const url = noticeListUrl(p, server);
     const call = (window.BAFetch && window.BAFetch.available())
       ? window.BAFetch.json(url, { 'game-alias': 'ba' })
       : fetch(url).then(function (r) { return r.json(); });
-    NT.loading = call.then(function (j) {
-      NT.loading = false;
+    data.loading = call.then(function (j) {
+      data.loading = false;
+      data.error = false;
       const list = (j && j.data) || [];
-      if (p > 0 && NT.list) NT.list = NT.list.concat(list);
-      else { NT.list = list; NT.at = Date.now(); }
-      NT.page = p;
-      NT.hasMore = list.length >= 20;
-      return NT.list;
+      if (p > 0 && data.list) data.list = data.list.concat(list);
+      else { data.list = list; data.at = Date.now(); }
+      data.page = p;
+      data.hasMore = list.length >= 20;
+      return data.list;
     }).catch(function () {
-      NT.loading = false;
-      return NT.list;
+      data.loading = false;
+      data.error = true;
+      return data.list;
     });
-    return NT.loading;
+    return data.loading;
   }
 
   function noticeView() {
-    const list = NT.list;
+    const server = NT.server;
+    const data = noticeData(server);
+    const list = data.list;
     let html = '<div style="height:12px"></div>';
+    html += '<div class="segwrap notice-server-filter"><div class="seg" role="group" aria-label="公告服务器">' +
+      [{ id: 0, name: '全部' }].concat(SERVERS).map(function (sv) {
+        return '<button type="button" class="' + (sv.id === NT.server ? 'on' : '') + '" data-act="nt-server" data-id="' + sv.id + '" aria-pressed="' + (sv.id === NT.server) + '">' + sv.name + '</button>';
+      }).join('') + '</div></div>';
 
     if (!list) {
-      loadNotices(true).then(function () { if (state.tab === 'notice') render(); });
-      return html + '<div class="empty">正在获取公告…</div>';
+      if (!data.loading && !data.error) {
+        loadNotices(true).then(function () {
+          if (state.tab === 'notice' && NT.server === server) render();
+        });
+      }
+      return html + '<div class="empty">' + (data.error
+        ? '公告加载失败 <button class="linkbtn" data-act="nt-retry">重试</button>'
+        : '正在获取公告…') + '</div>';
     }
 
+    if (!list.length) html += '<div class="empty">暂无该服务器公告</div>';
     html += list.map(function (n) {
       const thumb = n.thumb ? String(n.thumb).split(',')[0] : '';
       const img = thumb ? '<img data-murl="' + esc(absUrl(thumb)) + '" alt="">' : '<span class="noimg"></span>';
@@ -512,10 +537,10 @@
       '</button>';
     }).join('');
 
-    if (NT.hasMore) {
+    if (data.hasMore) {
       html += '<button class="morebtn" data-act="nt-more">加载更多</button>';
     }
-    html += '<div class="actfoot">数据来自 GameKee 公告区 · ' + fmtDate(Math.floor(NT.at / 1000)) +
+    html += '<div class="actfoot">数据来自 GameKee 公告区 · ' + fmtDate(Math.floor(data.at / 1000)) +
       ' 更新 <button class="linkbtn" data-act="nt-refresh">刷新</button></div>';
 
     setTimeout(function () { hydrateRemoteImages(view); }, 0);
@@ -575,7 +600,7 @@
   }
 
   function openNotice(id, preset) {
-    const meta = preset || (NT.list || []).filter(function (n) { return String(n.id) === String(id); })[0] || {};
+    const meta = preset || (noticeData().list || []).filter(function (n) { return String(n.id) === String(id); })[0] || {};
     NT.detail = {
       id: id, loading: true, html: '',
       title: meta.title || '',
@@ -589,6 +614,7 @@
       ? window.BAFetch.json(url, { 'game-alias': 'ba' })
       : fetch(url).then(function (r) { return r.json(); });
     call.then(function (j) {
+      if (!NT.detail || String(NT.detail.id) !== String(id)) return null;
       const d = (j && j.data) || {};
       const cdn = d.content_cdn ? ('https:' + d.content_cdn) : '';
       // 保留点进来时的标题（活动名）；只有没传标题时才用正文标题
@@ -599,17 +625,21 @@
         ? window.BAFetch.text(cdn, { Referer: 'https://www.gamekee.com/' })
         : fetch(cdn).then(function (r) { return r.text(); });
       return getCdn.then(function (txt) {
+        if (!NT.detail || String(NT.detail.id) !== String(id)) return;
         const o = JSON.parse(txt);
         const inner = typeof o.content === 'string' ? JSON.parse(o.content) : o;
         NT.detail.html = ntRender(inner);
         NT.detail.loading = false;
       });
     }).catch(function (e) {
+      if (!NT.detail || String(NT.detail.id) !== String(id)) return;
       NT.detail.loading = false;
       NT.detail.html = '<div class="empty">公告加载失败</div>';
     }).then(function () {
-      NT.detail.loading = false;
-      if (NT.detail && String(NT.detail.id) === String(id)) renderNoticeOverlay();
+      if (NT.detail && String(NT.detail.id) === String(id)) {
+        NT.detail.loading = false;
+        renderNoticeOverlay();
+      }
     });
   }
 
@@ -646,23 +676,37 @@
     NT.detail = null;
   }
 
+  function overviewDropdown(key, label, options, value) {
+    var selectedLabel = options[0][1];
+    options.forEach(function (option) {
+      if (String(option[0]) === String(value)) selectedLabel = option[1];
+    });
+    return '<div class="ov-dd" data-dd="' + key + '">' +
+      '<button type="button" class="ov-dd-toggle" data-act="ov-dd-toggle" data-dd="' + key + '" aria-label="' + esc(label + '：' + selectedLabel) + '" aria-haspopup="listbox" aria-expanded="false" aria-controls="ov-dd-menu-' + key + '">' +
+        '<span class="ov-dd-value">' + esc(selectedLabel) + '</span><span class="ov-dd-caret" aria-hidden="true">▾</span></button>' +
+      '<div id="ov-dd-menu-' + key + '" class="ov-dd-menu" role="listbox" aria-label="' + esc(label) + '" hidden>' + options.map(function (option) {
+        var selected = String(option[0]) === String(value);
+        return '<button type="button" class="ov-dd-option" role="option" aria-selected="' + selected + '" data-act="ov-dd-pick" data-dd="' + key + '" data-v="' + esc(option[0]) + '">' +
+          '<span>' + esc(option[1]) + '</span><span aria-hidden="true">' + (selected ? '✓' : '') + '</span></button>';
+      }).join('') + '</div></div>';
+  }
+
+  function overviewFilters() {
+    var poolMode = state.overviewMode === 'pool';
+    var html = '<div class="ov-dd-filter">';
+    html += overviewDropdown('server', '服务器', SERVERS.map(function (sv) { return [sv.id, sv.name]; }), ACT.server);
+    html += overviewDropdown('mode', '总览模式', [['activity', '活动'], ['pool', '卡池']], poolMode ? 'pool' : 'activity');
+    if (!poolMode) html += overviewDropdown('kind', '活动类型', KINDS, ACT.kind);
+    return html + '</div>';
+  }
+
   function overviewView() {
     warmActivities();
     warmPools();
     const now = Math.floor(Date.now() / 1000);
 
     let html = '<div style="height:12px"></div>';
-    // 服务器切换（活动与卡池共用）
-    html += '<div class="segwrap"><div class="seg">' + SERVERS.map(function (sv) {
-      return '<button class="' + (sv.id === ACT.server ? 'on' : '') + '" data-act="act-server" data-id="' + sv.id + '">' + sv.name + '</button>';
-    }).join('') + '</div></div>';
-
-    // 活动 / 卡池
-    html += '<div class="segwrap" style="margin-top:10px"><div class="seg">' +
-      '<button class="' + (state.overviewMode !== 'pool' ? 'on' : '') + '" data-act="ov-mode" data-m="activity">活动</button>' +
-      '<button class="' + (state.overviewMode === 'pool' ? 'on' : '') + '" data-act="ov-mode" data-m="pool">卡池</button>' +
-      '</div></div>';
-
+    html += overviewFilters();
     html += (state.overviewMode === 'pool') ? poolSection(now) : activitySection(now);
     return html;
   }
@@ -672,10 +716,7 @@
     const id = ACT.server;
     const data = ACT.data[id];
 
-    let html = '<div class="chiprow" style="margin-top:10px">' + KINDS.map(function (k) {
-      return '<button class="chip ' + (k[0] === ACT.kind ? 'on' : '') + '" data-act="act-kind" data-k="' + k[0] + '">' + k[1] + '</button>';
-    }).join('') + '</div>';
-
+    let html = '';
     if (!data) {
       loadActivities(false).then(function () {
         if (state.tab === 'overview' && state.overviewMode !== 'pool') rerenderOverview();
@@ -1955,6 +1996,7 @@
   }
 
   function render() {
+    closeOverviewDropdowns();
     if (state.tab !== 'more' || state.detail) stopPrefetchPolling();
     chrome();
     if (state.detail) {
@@ -2092,7 +2134,44 @@
   })();
 
   /* ----------------------------------------------------------------- events */
+  function closeOverviewDropdowns(restoreFocus, keepKey) {
+    var focusToggle = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.ov-dd'), function (dropdown) {
+      if (keepKey && dropdown.dataset.dd === keepKey) return;
+      var menu = dropdown.querySelector('.ov-dd-menu');
+      var toggle = dropdown.querySelector('.ov-dd-toggle');
+      if (menu && !menu.hidden && toggle) focusToggle = toggle;
+      if (menu) menu.hidden = true;
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    });
+    if (restoreFocus && focusToggle) focusToggle.focus();
+  }
+
+  window.addEventListener('pagehide', function () { closeOverviewDropdowns(); });
+  document.addEventListener('keydown', function (e) {
+    var menu = document.querySelector('.ov-dd-menu:not([hidden])');
+    if (!menu) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeOverviewDropdowns(true); return; }
+    var dropdown = e.target.closest('.ov-dd');
+    if (!dropdown || dropdown.querySelector('.ov-dd-menu') !== menu) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      var options = Array.prototype.slice.call(menu.querySelectorAll('[role="option"]'));
+      if (!options.length) return;
+      var index = options.indexOf(document.activeElement);
+      if (e.key === 'Home') index = 0;
+      else if (e.key === 'End') index = options.length - 1;
+      else index = (index + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+      options[index].focus();
+    }
+  });
+  document.addEventListener('focusin', function (e) {
+    var dropdown = e.target.closest('.ov-dd');
+    closeOverviewDropdowns(false, dropdown ? dropdown.dataset.dd : null);
+  });
+
   document.addEventListener('click', function (e) {
+    if (!e.target.closest('.ov-dd-filter')) closeOverviewDropdowns();
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
     const act = btn.dataset.act;
@@ -2283,22 +2362,65 @@
       return;
     }
     if (act === 'nt-close') { closeNotice(); return; }
-    if (act === 'nt-more') { loadNotices(false, (NT.page || 0) + 1).then(function () { render(); }); return; }
-    if (act === 'nt-refresh') { loadNotices(true).then(function () { render(); }); toast('正在刷新公告…'); return; }
+    if (act === 'nt-server') {
+      const server = Number(btn.dataset.id);
+      if (server === NT.server) return;
+      closeNotice();
+      NT.server = server;
+      NT.data[server] = emptyNoticeData();
+      render();
+      return;
+    }
+    if (act === 'nt-more') {
+      const server = NT.server;
+      loadNotices(false, (noticeData().page || 0) + 1).then(function () {
+        if (state.tab === 'notice' && NT.server === server) render();
+      });
+      return;
+    }
+    if (act === 'nt-refresh') {
+      const server = NT.server;
+      loadNotices(true).then(function () {
+        if (state.tab === 'notice' && NT.server === server) render();
+      });
+      toast('正在刷新公告…');
+      return;
+    }
+    if (act === 'nt-retry') { noticeData().error = false; render(); return; }
     if (act === 'nt-link') { const u = btn.dataset.url; if (u) openExternal(u); return; }
-    if (act === 'ov-mode') { state.overviewMode = btn.dataset.m === 'pool' ? 'pool' : 'activity'; if (state.tab === 'overview') rerenderOverview(); return; }
     if (act === 'pool-tag') { POOL.tag = Number(btn.dataset.k) || 0; POOL.showEnded = false; if (state.tab === 'overview') rerenderOverview(); return; }
     if (act === 'pool-more') { POOL.allHistory = !POOL.allHistory; if (state.tab === 'overview') rerenderOverview(); return; }
     if (act === 'pool-refresh') { loadPools(true).then(function () { if (state.tab === 'overview') rerenderOverview(); }); toast('正在刷新卡池…'); return; }
     if (act === 'pool-open') { const u = btn.dataset.url; if (u) openExternal(u); return; }
-    if (act === 'act-server') {
-      ACT.server = Number(btn.dataset.id);
-      ACT.showEnded = false;
-      POOL.showEnded = false;
-      if (state.tab === 'overview') rerenderOverview();
+    if (act === 'ov-dd-toggle') {
+      var menu = document.getElementById('ov-dd-menu-' + btn.dataset.dd);
+      if (!menu) return;
+      var opening = menu.hidden;
+      closeOverviewDropdowns();
+      menu.hidden = !opening;
+      btn.setAttribute('aria-expanded', String(opening));
+      if (opening) {
+        var selected = menu.querySelector('[aria-selected="true"]');
+        if (selected) selected.focus();
+      }
       return;
     }
-    if (act === 'act-kind') { ACT.kind = Number(btn.dataset.k); if (state.tab === 'overview') rerenderOverview(); return; }
+    if (act === 'ov-dd-pick') {
+      var key = btn.dataset.dd;
+      if (key === 'server') {
+        ACT.server = Number(btn.dataset.v);
+        ACT.showEnded = false;
+        POOL.showEnded = false;
+      } else if (key === 'mode') {
+        state.overviewMode = btn.dataset.v === 'pool' ? 'pool' : 'activity';
+      } else if (key === 'kind') {
+        ACT.kind = Number(btn.dataset.v);
+      }
+      if (state.tab === 'overview') rerenderOverview();
+      var nextToggle = document.querySelector('.ov-dd-toggle[data-dd="' + key + '"]');
+      if (nextToggle) nextToggle.focus();
+      return;
+    }
     if (act === 'act-more') { ACT.allHistory = !ACT.allHistory; if (state.tab === 'overview') rerenderOverview(); return; }
     if (act === 'act-refresh') { loadActivities(true).then(function () { if (state.tab === 'overview') rerenderOverview(); }); toast('正在刷新活动…'); return; }
     if (act === 'act-open') { const u = btn.dataset.url; if (u) openExternal(u); return; }
